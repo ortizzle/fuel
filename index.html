@@ -10,20 +10,10 @@
 <meta name="apple-mobile-web-app-title" content="Fuel">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#f3eee5" id="meta-theme-color">
-<link rel="icon" type="image/svg+xml" id="pwa-favicon">
-<link rel="apple-touch-icon" sizes="180x180" id="pwa-apple-icon">
-<script>
-(function () {
-  var svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="112" fill="#172a45"/><text x="256" y="345" font-family="Manrope, Helvetica, Arial, sans-serif" font-size="280" font-weight="800" text-anchor="middle" fill="#fffcf7">F</text><circle cx="392" cy="128" r="34" fill="#b8302f"/><circle cx="392" cy="212" r="34" fill="#a37a00"/><circle cx="392" cy="296" r="34" fill="#4257d9"/></svg>';
-  var encoded = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
-  document.getElementById('pwa-favicon').href = encoded;
-  document.getElementById('pwa-apple-icon').href = encoded;
-  var manifest = { name: 'Fuel', short_name: 'Fuel', description: 'Food, calories and macros', start_url: './', scope: './', display: 'standalone', background_color: '#f3eee5', theme_color: '#f3eee5', icons: [{ src: encoded, sizes: '512x512', type: 'image/svg+xml', purpose: 'any maskable' }] };
-  var link = document.createElement('link'); link.rel = 'manifest';
-  link.href = URL.createObjectURL(new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' }));
-  document.head.appendChild(link);
-})();
-</script>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="icon" href="icon-192.png" sizes="192x192" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -1861,6 +1851,7 @@ function init() {
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSheet(); });
   let resizeTimer = null;
   window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { if (state.view === 'insights') renderInsights(); }, 200); });
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
   render();
   AI.init();
   if (Howlers.connected()) Howlers.refresh(false).then(() => { renderWorkoutStrip(); if (state.view === 'insights') renderInsights(); }).catch(() => {});

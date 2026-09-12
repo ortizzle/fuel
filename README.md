@@ -53,7 +53,10 @@ Records carry `id` / `updatedAt` / tombstones, so the canonical Gist safe-merge 
 ## Repo layout
 
 - `index.html` — the whole app (CSS and JS inline; ZXing loads from a CDN only when a browser lacks a native barcode detector).
-- `icon.svg` — the mark used for the favicon and home-screen icon (also inlined in the page).
+- `manifest.webmanifest` — the web app manifest. It must be a real file at a real URL: Chrome's
+  install service fetches it (and the icons) from the server to build the home-screen app.
+- `icon.svg`, `icon-192.png`, `icon-512.png`, `icon-maskable-512.png`, `apple-touch-icon.png` — the app mark.
+- `sw.js` — service worker: offline shell, network-first for the page so deploys land immediately.
 - `.nojekyll` — tells GitHub Pages to serve the files as they are.
 - `.claude/launch.json` — local run config (`python3 -m http.server 4400`, open `http://localhost:4400/`).
 
