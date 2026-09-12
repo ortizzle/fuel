@@ -1536,6 +1536,84 @@ function openEditSheet(id) {
     el('div', { class: 'btn-row' }, del, save));
 }
 
+/* ---------- Backup & restore ----------
+   A backup carries the log, the targets and the remembered barcodes, so one file
+   restores a phone completely. Restoring MERGES by record id with the newer copy
+   winning, so pulling in an old file can never delete what is already here. ---------- */
+function backupPayload() {
+  return { app: 'fuel', schema: 1, exportedAt: new Date().toISOString(), date: AZ.today(),
+    settings: state.settings, products: Store.get('products', {}) || {}, data: state.data };
+}
+function backupFile() {
+  const json = JSON.stringify(backupPayload(), null, 1);
+  return new File([json], 'fuel-backup-' + AZ.today() + '.json', { type: 'application/json' });
+}
+function markBackedUp() { Store.set('last_backup', Date.now()); }
+function lastBackupText() {
+  const t = Store.get('last_backup', 0);
+  if (!t) return { text: 'Never backed up.', stale: true };
+  const days = Math.floor((Date.now() - t) / 86400000);
+  return { text: 'Last backup ' + (days === 0 ? 'today' : days === 1 ? 'yesterday' : days + ' days ago') + '.', stale: days >= 14 };
+}
+function downloadBackup() {
+  const f = backupFile();
+  const url = URL.createObjectURL(f);
+  const a = el('a', { href: url, download: f.name });
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+  markBackedUp();
+  return f.name;
+}
+function canShareBackup() {
+  try { return !!(navigator.canShare && navigator.share && navigator.canShare({ files: [backupFile()] })); }
+  catch (e) { return false; }
+}
+async function shareBackup() {
+  const f = backupFile();
+  try {
+    await navigator.share({ files: [f], title: f.name, text: 'Fuel backup ' + AZ.today() });
+    markBackedUp();
+    return 'shared';
+  } catch (e) {
+    if (e && (e.name === 'AbortError' || /abort|cancel/i.test(String(e.message || '')))) return 'cancelled';
+    downloadBackup();
+    return 'downloaded';
+  }
+}
+function mergeRecords(mine, incoming) {
+  const out = { records: Object.assign({}, (incoming && incoming.records) || {}) };
+  for (const [id, rec] of Object.entries((mine && mine.records) || {})) {
+    const r = out.records[id];
+    if (!r || (rec.updatedAt || 0) > (r.updatedAt || 0)) out.records[id] = rec;
+  }
+  const cutoff = Date.now() - 60 * 86400000;
+  for (const [id, rec] of Object.entries(out.records)) if (rec && rec.deleted && (rec.updatedAt || 0) < cutoff) delete out.records[id];
+  return out;
+}
+function liveCount(d) { return Object.values((d && d.records) || {}).filter(r => r && r.type === 'entry' && !r.deleted).length; }
+async function restoreFromFile(file, onDone) {
+  let parsed;
+  try { parsed = JSON.parse(await file.text()); }
+  catch (e) { toast('That file is not valid JSON'); return; }
+  const incoming = (parsed && parsed.data && parsed.data.records) ? parsed.data : ((parsed && parsed.records) ? parsed : null);
+  if (!incoming) { toast('No Fuel data found in that file'); return; }
+  const theirs = liveCount(incoming), mine = liveCount(state.data);
+  showModal({
+    title: 'Restore this backup?',
+    message: 'The file holds ' + theirs + (theirs === 1 ? ' entry' : ' entries') + '. They merge with the ' + mine + ' already on this device, and where both have the same entry the newer one wins. Nothing is deleted.',
+    confirmText: 'Restore', cancelText: 'Cancel',
+    onConfirm: () => {
+      state.data = mergeRecords(state.data, incoming);
+      saveData();
+      if (parsed.products) Store.set('products', Object.assign({}, Store.get('products', {}) || {}, parsed.products));
+      if (parsed.settings && parsed.settings.targets) { state.settings.targets = Object.assign({}, state.settings.targets, parsed.settings.targets); saveSettings(); }
+      render();
+      toast('Restored — ' + liveCount(state.data) + ' entries now');
+      if (onDone) onDone();
+    }
+  });
+}
+
 function openSettings() {
   const s = openSheet({ title: 'Settings', sub: 'Targets, appearance, Claude, data' });
   const T = state.settings.targets;
@@ -1555,6 +1633,18 @@ function openSettings() {
     el('button', { class: 'btn ghost', type: 'button', text: 'Clear', style: 'width:auto;flex:none', onclick: () => { Store.remove('usda_key'); usdaIn.placeholder = 'optional'; toast('USDA key removed'); } }));
   const exportBox = el('div');
   const howlersBox = el('div'); renderHowlersSettings(howlersBox);
+  const age = lastBackupText();
+  const backupAge = el('div', { class: 'note', text: age.text, style: age.stale ? 'color:var(--warn);font-weight:600' : '' });
+  const refreshAge = () => { const a = lastBackupText(); backupAge.textContent = a.text; backupAge.style.cssText = a.stale ? 'color:var(--warn);font-weight:600' : ''; };
+  const restoreIn = el('input', { type: 'file', accept: 'application/json,.json', class: 'hidden', 'aria-label': 'Backup file to restore' });
+  restoreIn.addEventListener('change', () => { const f = restoreIn.files && restoreIn.files[0]; restoreIn.value = ''; if (f) restoreFromFile(f, () => closeSheet()); });
+  const downloadBtn = el('button', { class: 'btn', type: 'button', text: 'Download file', onclick: () => { const n = downloadBackup(); refreshAge(); toast('Saved ' + n); } });
+  const shareBtn = el('button', { class: 'btn primary', type: 'button', text: 'Save to Drive', onclick: async () => {
+    const how = await shareBackup(); refreshAge();
+    if (how === 'shared') toast('Backup sent');
+    else if (how === 'downloaded') toast('Sharing unavailable — downloaded instead');
+  } });
+  if (!canShareBackup()) { shareBtn.classList.add('hidden'); downloadBtn.classList.add('primary'); }
   const entryCount = Object.values(state.data.records).filter(r => r.type === 'entry' && !r.deleted).length;
   const stats = el('div', { class: 'note', text: entryCount + ' entries stored on this device · ' + Object.keys(Store.get('products', {}) || {}).length + ' remembered barcodes' });
   s.body.append(
@@ -1569,13 +1659,17 @@ function openSettings() {
     el('div', { class: 'field' }, el('label', { text: 'USDA FoodData Central key (barcode fallback + food search)' }), usdaRow,
       el('div', { class: 'note' }, 'Free, instant signup at ', el('a', { href: 'https://fdc.nal.usda.gov/api-key-signup', target: '_blank', rel: 'noopener', text: 'fdc.nal.usda.gov' }), '. Until then, lookups use USDA\'s shared demo key (about 30 an hour).')),
     el('div', { class: 'field', style: 'margin-top:16px' }, el('label', { text: 'The Howlers workouts' }), howlersBox),
-    el('div', { class: 'field', style: 'margin-top:16px' }, el('label', { text: 'Data' }), stats,
+    el('div', { class: 'field', style: 'margin-top:16px' }, el('label', { text: 'Backup' }), stats, backupAge,
+      el('div', { class: 'btn-row' }, shareBtn, downloadBtn),
+      el('button', { class: 'btn ghost', type: 'button', text: 'Restore from a backup file', style: 'margin-top:10px', onclick: () => restoreIn.click() }), restoreIn,
+      el('div', { class: 'note' }, 'A backup is one JSON file holding your log, targets and remembered barcodes. Saving it puts a copy in Drive, Files or anywhere else you pick.')),
+    el('div', { class: 'field', style: 'margin-top:16px' }, el('label', { text: 'Data' }),
       el('div', { class: 'btn-row' },
         el('button', { class: 'btn', type: 'button', text: 'Load 2 sample weeks', onclick: () => { seedSampleDays(14); render(); toast('Two sample weeks loaded'); closeSheet(); } }),
-        el('button', { class: 'btn', type: 'button', text: 'Export JSON', onclick: () => { clear(exportBox); const ta = el('textarea', { readonly: true, 'aria-label': 'Exported data', style: 'min-height:140px;font-family:ui-monospace,monospace;font-size:12px' }); ta.value = JSON.stringify(state.data, null, 1); exportBox.append(ta, el('button', { class: 'btn ghost', type: 'button', text: 'Copy to clipboard', onclick: async () => { try { await navigator.clipboard.writeText(ta.value); toast('Copied'); } catch (e) { ta.select(); toast('Select all and copy'); } } })); } })),
+        el('button', { class: 'btn', type: 'button', text: 'Copy JSON', onclick: () => { clear(exportBox); const ta = el('textarea', { readonly: true, 'aria-label': 'Exported data', style: 'min-height:140px;font-family:ui-monospace,monospace;font-size:12px' }); ta.value = JSON.stringify(backupPayload(), null, 1); exportBox.append(ta, el('button', { class: 'btn ghost', type: 'button', text: 'Copy to clipboard', onclick: async () => { try { await navigator.clipboard.writeText(ta.value); toast('Copied'); } catch (e) { ta.select(); toast('Select all and copy'); } } })); } })),
       exportBox,
       el('button', { class: 'btn danger', type: 'button', text: 'Clear all data on this device', style: 'margin-top:10px', onclick: () => showModal({ title: 'Clear everything?', message: 'All logged entries and remembered barcodes on this device will be erased. Keys and targets stay.', confirmText: 'Erase', cancelText: 'Keep', danger: true, onConfirm: () => { state.data = { records: {} }; saveData(); Store.remove('products'); render(); closeSheet(); toast('Cleared'); } }) })),
-    el('div', { class: 'note', style: 'margin-top:18px' }, 'Fuel prototype v0.2 · data lives in this browser (Gist sync can be added later) · dates use Arizona time'));
+    el('div', { class: 'note', style: 'margin-top:18px' }, 'Fuel prototype v0.3 · data lives on this device, so back it up · dates use Arizona time'));
 }
 
 /* ---------- Deterministic sample data: two weeks with realistic variety, so Insights has something to say ---------- */

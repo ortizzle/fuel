@@ -32,7 +32,8 @@ Every entry carries a **meal** (Breakfast, Lunch, Dinner, Snack, Pre-workout, Po
 - **Claude API key** (photos, descriptions, summaries). Stored only in this browser; calls go straight from the phone to Anthropic. Set a monthly spend limit on the key. Model: Sonnet 5 by default, Opus 5 or Haiku 4.5 selectable.
 - **USDA key** (optional, free): removes the shared demo-key limit for barcode fallback and search.
 - **The Howlers**: connection status, refresh, whose workouts.
-- **Data**: load two sample weeks, export JSON, clear this device.
+- **Backup**: save a dated JSON file holding the log, targets and remembered barcodes. On Android the share sheet sends it straight to Drive; elsewhere it downloads. Restoring merges by entry, newest wins, so an old file can never delete newer work or resurrect something you deleted. The panel shows how long it has been and turns amber after two weeks.
+- **Data**: load two sample weeks, copy the JSON, clear this device.
 
 ## Data model (sync-ready)
 
@@ -69,7 +70,7 @@ GitHub Pages serves `main` directly, like the other ortizzle apps. One-time setu
 - **Barcode coverage** is the biggest practical risk: Open Food Facts misses a share of US store brands and new products; the USDA fallback and the remembered-products memory cover most of the rest, and "photograph the label" covers the tail.
 - **Photo estimates** are estimates: good at identifying items and reading labels, typically 20–30% off on mixed plates, blind to oils and sauces. The hint line and confidence badges exist for that; a kitchen scale plus the grams box beats any AI.
 - **Trends only count logged days**, so consistency matters more than precision; recents / favorites / saved meals is the next feature for that reason.
-- **Storage** is on-device. Chrome keeps it unless browsing data is cleared, and the app requests persistent storage; before relying on it daily, add Gist sync or use Export JSON.
+- **Storage** is on-device. Chrome keeps it unless browsing data is cleared, and the app requests persistent storage. Back up from Settings every couple of weeks; the panel nags when it is stale. Fully automatic off-device backup needs Gist sync, which is not built yet.
 - **Workouts** come from The Howlers until that season ends in January; Strava or Garmin export can replace it later.
 
 ## Roadmap
