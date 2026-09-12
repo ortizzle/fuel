@@ -46,6 +46,12 @@ letters always sit beside the numbers so identity never depends on colour alone.
 - **Every storage read and write goes through `Store`**, which namespaces with `fuel_`.
   That single choke point is what would make per-person profiles cheap.
 - **Dates go through `AZ`.** Never `toISOString().split('T')[0]` — it drifts to UTC.
+- **EXIF is read before the resize, never after.** `shrinkImage` redraws through a canvas,
+  which drops all metadata, so `photoTimestamp` must see the original `File`. EXIF
+  `DateTimeOriginal` is wall-clock at capture with no timezone, so use it as-is rather than
+  passing it through `AZ`.
+- **Scans default to Packaged** and deliberately do not write `last_context`, so scanning a
+  bar never changes what your next hand-added meal defaults to.
 - **Restore merges, never overwrites.** Newest `updatedAt` wins and tombstones are
   respected, so an old backup cannot delete newer entries or resurrect deleted ones.
 
