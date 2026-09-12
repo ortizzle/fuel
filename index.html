@@ -333,7 +333,7 @@ const AZ = {
   },
   weekday(dateStr) { return new Date(dateStr + 'T12:00:00').getDay(); },
   hour() { return Number(new Intl.DateTimeFormat('en-US', { timeZone: this.tz, hour: 'numeric', hourCycle: 'h23' }).format(new Date())) || 0; },
-  timeHM() { return new Intl.DateTimeFormat('en-GB', { timeZone: this.tz, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date()); }
+  timeHM(d) { return new Intl.DateTimeFormat('en-GB', { timeZone: this.tz, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(d || new Date()); }
 };
 
 const Store = {
@@ -477,8 +477,22 @@ function uid() { return Date.now().toString(36) + '-' + Math.random().toString(3
 function mealIndex(m) { const i = MEALS.findIndex(x => x[0] === m); return i < 0 ? 99 : i; }
 function mealLabel(m) { const f = MEALS.find(x => x[0] === m); return f ? f[1] : cap(m); }
 function contextLabel(c) { const f = CONTEXTS.find(x => x[0] === c); return f ? f[1] : 'Other'; }
-function guessMeal() { const h = AZ.hour(); if (h < 10) return 'breakfast'; if (h < 14) return 'lunch'; if (h < 17) return 'snack'; if (h < 21) return 'dinner'; return 'snack'; }
+function guessMealAt(h) { if (h < 10) return 'breakfast'; if (h < 14) return 'lunch'; if (h < 17) return 'snack'; if (h < 21) return 'dinner'; return 'snack'; }
+function guessMeal(time) { return guessMealAt(time ? (parseInt(String(time).slice(0, 2), 10) || 0) : AZ.hour()); }
+function prettyTime(hhmm) {
+  const [h, m] = String(hhmm || '').split(':').map(Number);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return '';
+  return (h % 12 === 0 ? 12 : h % 12) + ':' + String(m).padStart(2, '0') + ' ' + (h >= 12 ? 'PM' : 'AM');
+}
+function whenLabel(st) {
+  const today = AZ.today();
+  const day = st.date === today ? 'today' : st.date === AZ.addDays(today, -1) ? 'yesterday' : AZ.pretty(st.date);
+  return day + ' at ' + prettyTime(st.time);
+}
 function lastContext() { const c = Store.get('last_context', 'home'); return CONTEXTS.some(x => x[0] === c) ? c : 'home'; }
+// A scanned barcode is a packaged food by definition, so it starts there rather than
+// inheriting whatever you logged last. Scans also leave the manual default alone.
+function defaultContext(source) { return source === 'upc' ? 'packaged' : lastContext(); }
 function currentModel() { const m = state.settings.model; return MODELS.some(x => x[0] === m) ? m : 'claude-sonnet-5'; }
 function cleanPer(per) {
   per = per || {};
@@ -505,7 +519,7 @@ function addEntry(e) {
     note: e.note ? String(e.note).slice(0, 300) : '',
     createdAt: now, updatedAt: now
   };
-  Store.set('last_context', context);
+  if (e.source !== 'upc') Store.set('last_context', context);
   saveData();
   return id;
 }
@@ -657,7 +671,7 @@ function contextSelect(value) { return el('select', { 'aria-label': 'Context' },
 
 /* ---------- Product card: one known food with a serving size → log it ---------- */
 function renderProductCard(container, product, { source, onAdded, barcode }) {
-  let servings = 1, meal = guessMeal(), context = lastContext();
+  let servings = 1, meal = guessMeal(), context = defaultContext(source);
   const per = cleanPer(product.per);
   const grams = product.serving && Number(product.serving.grams) || null;
   const imgEl = product.image ? el('img', { src: product.image, alt: '' }) : el('div', { class: 'ph' }, svgIcon(ICON.plate, 24));
@@ -696,10 +710,13 @@ function renderProductCard(container, product, { source, onAdded, barcode }) {
 }
 
 /* ---------- Estimate results: several items from a photo or a description ---------- */
-function renderEstimateResults(container, result, { source, onAdded, barcode }) {
+function renderEstimateResults(container, result, { source, onAdded, barcode, when }) {
   clear(container);
   const items = result.items.map(it => Object.assign({ checked: true, servings: 1 }, it));
-  let meal = guessMeal(), context = lastContext();
+  // A photo carries its own timestamp, so the entry lands when you ate, not when you logged it.
+  let stamp = (when && when.minutesAgo > 10) ? when : null;
+  let meal = guessMeal(stamp ? stamp.time : null), context = defaultContext(barcode ? 'upc' : source);
+  let mealTouched = false;
   if (!items.length) {
     container.appendChild(el('div', { class: 'status err' }, el('span', { text: result.notes || 'No food was recognized.' })));
     return;
@@ -721,17 +738,35 @@ function renderEstimateResults(container, result, { source, onAdded, barcode }) 
       el('div', {}, kcalEl, macEl),
       el('div', { class: 'rstep' }, el('span', { text: 'Portion ×' }), st)));
   }
-  const mealSel = mealSelect(meal); mealSel.addEventListener('change', () => { meal = mealSel.value; });
+  const mealSel = mealSelect(meal); mealSel.addEventListener('change', () => { meal = mealSel.value; mealTouched = true; });
   const ctxSel = contextSelect(context); ctxSel.addEventListener('change', () => { context = ctxSel.value; });
+
+  let whenField = null;
+  if (stamp) {
+    const useStamp = (on) => {
+      stamp = on ? when : null;
+      if (!mealTouched) { meal = guessMeal(stamp ? stamp.time : null); mealSel.value = meal; }
+    };
+    whenField = el('div', { class: 'field', style: 'margin-top:10px' },
+      el('label', { text: 'When you ate' }),
+      segControl([['photo', 'Photo time'], ['now', 'Right now']], 'photo', (v) => useStamp(v === 'photo')),
+      el('div', { class: 'note', style: 'margin-bottom:0' },
+        (when.from === 'exif' ? 'The photo was taken ' : 'The file is dated ') + whenLabel(when) + '.'));
+  }
+
   addBtn.addEventListener('click', () => {
     const sel = items.filter(i => i.checked);
-    for (const it of sel) addEntry({ name: it.name, source, barcode: barcode || null, servings: it.servings, meal, context, serving: { label: it.portion, grams: it.grams }, per: it.per, note: it.confidence === 'low' ? 'low-confidence estimate' : '' });
+    const landed = stamp ? stamp.date : state.date;
+    for (const it of sel) addEntry({ name: it.name, source, barcode: barcode || null, servings: it.servings, meal, context, date: stamp ? stamp.date : undefined, time: stamp ? stamp.time : undefined, serving: { label: it.portion, grams: it.grams }, per: it.per, note: it.confidence === 'low' ? 'low-confidence estimate' : '' });
+    if (landed !== state.date) state.date = landed;
     if (barcode && sel.length === 1) FoodDB.rememberProduct({ name: sel[0].name, brand: '', barcode, serving: { label: sel[0].portion, grams: sel[0].grams }, per: sel[0].per, per100: null, image: null, source: 'photo' });
-    render(); toast('Logged ' + sel.length + (sel.length === 1 ? ' item' : ' items'));
+    render();
+    toast('Logged ' + sel.length + (sel.length === 1 ? ' item' : ' items') + (landed !== AZ.today() ? ' to ' + AZ.pretty(landed) : ''));
     if (onAdded) onAdded();
   });
   refreshBtn();
   container.append(list, result.notes ? el('div', { class: 'note', text: result.notes }) : null,
+    whenField,
     el('div', { class: 'grid-2', style: 'margin-top:10px' }, el('div', { class: 'field' }, el('label', { text: 'Meal' }), mealSel), el('div', { class: 'field' }, el('label', { text: 'Context' }), ctxSel)),
     addBtn);
 }
@@ -908,6 +943,89 @@ function parseEstimate(raw) {
   })).filter(it => it.per.kcal > 0 || it.per.protein > 0 || it.per.carbs > 0 || it.per.fat > 0);
   return { items, notes: String(obj.notes || '').slice(0, 300) };
 }
+/* ---------- Photo capture time ----------
+   A resize redraws through a canvas, which drops EXIF, so this reads the original
+   bytes first. DateTimeOriginal is wall-clock at the moment of the shot with no
+   timezone attached, which is exactly what a food log wants. ---------- */
+function parseExifDate(view) {
+  if (view.byteLength < 4 || view.getUint16(0) !== 0xFFD8) return null;
+  let offset = 2;
+  while (offset < view.byteLength - 4) {
+    if (view.getUint8(offset) !== 0xFF) { offset++; continue; }
+    const marker = view.getUint8(offset + 1);
+    if (marker === 0xD8 || marker === 0x01 || (marker >= 0xD0 && marker <= 0xD7)) { offset += 2; continue; }
+    if (marker === 0xDA || marker === 0xD9) break;
+    const size = view.getUint16(offset + 2);
+    if (size < 2) break;
+    if (marker === 0xE1 && offset + 10 < view.byteLength &&
+        view.getUint32(offset + 4) === 0x45786966 && view.getUint16(offset + 8) === 0x0000) {
+      return readTiffDate(view, offset + 10);
+    }
+    offset += 2 + size;
+  }
+  return null;
+}
+function readTiffDate(view, tiff) {
+  if (tiff + 8 > view.byteLength) return null;
+  const le = view.getUint16(tiff) === 0x4949;
+  const u16 = (o) => (o + 2 <= view.byteLength ? view.getUint16(o, le) : 0);
+  const u32 = (o) => (o + 4 <= view.byteLength ? view.getUint32(o, le) : 0);
+  if (u16(tiff + 2) !== 0x002A) return null;
+  const findTag = (dir, tag) => {
+    if (!dir || dir + 2 > view.byteLength) return 0;
+    const n = u16(dir);
+    if (n > 512) return 0;
+    for (let i = 0; i < n; i++) {
+      const e = dir + 2 + i * 12;
+      if (e + 12 > view.byteLength) return 0;
+      if (u16(e) === tag) return e;
+    }
+    return 0;
+  };
+  const ascii = (entry) => {
+    const count = u32(entry + 4);
+    if (count < 10 || count > 64) return '';
+    const at = count > 4 ? tiff + u32(entry + 8) : entry + 8;
+    if (at < 0 || at + count > view.byteLength) return '';
+    let out = '';
+    for (let i = 0; i < count - 1; i++) out += String.fromCharCode(view.getUint8(at + i));
+    return out;
+  };
+  const ifd0 = tiff + u32(tiff + 4);
+  let entry = 0;
+  const ptr = findTag(ifd0, 0x8769);
+  if (ptr) entry = findTag(tiff + u32(ptr + 8), 0x9003) || findTag(tiff + u32(ptr + 8), 0x9004);
+  if (!entry) entry = findTag(ifd0, 0x0132);
+  if (!entry) return null;
+  const m = ascii(entry).match(/^(\d{4}):(\d{2}):(\d{2})[ T](\d{2}):(\d{2})/);
+  return m ? { date: m[1] + '-' + m[2] + '-' + m[3], time: m[4] + ':' + m[5] } : null;
+}
+function readExifDate(file) {
+  return new Promise((resolve) => {
+    try {
+      const fr = new FileReader();
+      fr.onerror = () => resolve(null);
+      fr.onload = () => { try { resolve(parseExifDate(new DataView(fr.result))); } catch (e) { resolve(null); } };
+      fr.readAsArrayBuffer(file.slice(0, 256 * 1024));
+    } catch (e) { resolve(null); }
+  });
+}
+async function photoTimestamp(file) {
+  if (!file) return null;
+  let stamp = await readExifDate(file), from = 'exif';
+  if (!stamp && file.lastModified) {
+    const d = new Date(file.lastModified);
+    if (!isNaN(d.getTime())) { stamp = { date: AZ.dateKey(d), time: AZ.timeHM(d) }; from = 'file'; }
+  }
+  if (!stamp) return null;
+  const today = AZ.today();
+  if (stamp.date > today || AZ.daysBetween(stamp.date, today) > 400) return null;  // clock nonsense
+  const mins = (t) => { const [a, b] = t.split(':').map(Number); return a * 60 + b; };
+  stamp.from = from;
+  stamp.minutesAgo = AZ.daysBetween(stamp.date, today) * 1440 + (mins(AZ.timeHM()) - mins(stamp.time));
+  return stamp;
+}
+
 function shrinkImage(file, maxSide, quality) {
   maxSide = maxSide || 1280; quality = quality || 0.85;
   return new Promise((resolve, reject) => {
@@ -1341,10 +1459,10 @@ function openPhotoSheet({ barcode } = {}) {
     preview.src = URL.createObjectURL(file); preview.classList.remove('hidden');
     statusLine(status, 'Preparing photo…', 'busy');
     try {
-      const blob = await shrinkImage(file, 1280, 0.85);
+      const [blob, when] = await Promise.all([shrinkImage(file, 1280, 0.85), photoTimestamp(file)]);
       const res = await AI.estimate({ imageBlob: blob, text: hint.value.trim(), onStatus: (m) => statusLine(status, m, 'busy') });
       status.classList.add('hidden');
-      renderEstimateResults(result, res, { source: 'photo', barcode, onAdded: () => closeSheet() });
+      renderEstimateResults(result, res, { source: 'photo', barcode, when, onAdded: () => closeSheet() });
       rerun.classList.remove('hidden');
     } catch (e) {
       rerun.classList.remove('hidden');
@@ -1476,7 +1594,7 @@ function renderCustomTab(pane, prefill) {
   const carb = numInput({ placeholder: '0', 'aria-label': 'Carb grams' });
   const fat = numInput({ placeholder: '0', 'aria-label': 'Fat grams' });
   const fiber = numInput({ placeholder: '0', 'aria-label': 'Fiber grams' });
-  let servings = 1, meal = guessMeal(), context = lastContext();
+  let servings = 1, meal = guessMeal(), context = defaultContext(prefill.barcode ? 'upc' : 'manual');
   const sel = mealSelect(meal); sel.addEventListener('change', () => { meal = sel.value; });
   const ctxSel = contextSelect(context); ctxSel.addEventListener('change', () => { context = ctxSel.value; });
   const st = stepper({ value: 1, onChange: (v) => { servings = v; } });
@@ -1950,7 +2068,7 @@ function init() {
   AI.init();
   if (Howlers.connected()) Howlers.refresh(false).then(() => { renderWorkoutStrip(); if (state.view === 'insights') renderInsights(); }).catch(() => {});
 }
-window.Fuel = { state, AZ, Store, Howlers, addEntry, updateEntry, deleteEntry, entriesFor, dayTotals, computeStats, render, renderInsights, showView, Scanner, FoodDB, AI, parseEstimate, parseJSONLoose, normalizeOFF, normalizeUSDA, normalizeBarcode, upcEToA, codeVariants, openScanSheet, openPhotoSheet, openAddSheet, openEditSheet, openSettings, seedSampleDays, applyScheme, closeSheet, MEALS, CONTEXTS };
+window.Fuel = { state, AZ, Store, Howlers, photoTimestamp, parseExifDate, guessMeal, defaultContext, addEntry, updateEntry, deleteEntry, entriesFor, dayTotals, computeStats, render, renderInsights, showView, Scanner, FoodDB, AI, parseEstimate, parseJSONLoose, normalizeOFF, normalizeUSDA, normalizeBarcode, upcEToA, codeVariants, openScanSheet, openPhotoSheet, openAddSheet, openEditSheet, openSettings, seedSampleDays, applyScheme, closeSheet, MEALS, CONTEXTS };
 init();
 })();
 </script>
