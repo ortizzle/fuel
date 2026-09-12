@@ -52,6 +52,12 @@ letters always sit beside the numbers so identity never depends on colour alone.
   passing it through `AZ`.
 - **Scans default to Packaged** and deliberately do not write `last_context`, so scanning a
   bar never changes what your next hand-added meal defaults to.
+- **`serving.label` is free text; `serving.grams` is the number that matters.** Editing the
+  gram weight rescales `per` proportionally and rescales `servings` inversely, so correcting
+  a wrong serving size never changes the day's total. Open Food Facts entries with no serving
+  size on file come back flagged `serving.unknown` with per-100g figures.
+- **Never hand a conditional child to a native `append()`** — it renders the literal text
+  "null". Use `addKids(parent, ...)` or the `el()` helper, both of which filter.
 - **Restore merges, never overwrites.** Newest `updatedAt` wins and tombstones are
   respected, so an old backup cannot delete newer entries or resurrect deleted ones.
 

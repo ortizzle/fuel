@@ -404,6 +404,15 @@ function el(tag, attrs, ...kids) {
   return node;
 }
 function clear(node) { while (node.firstChild) node.removeChild(node.firstChild); }
+// Native append() renders a null child as the literal text "null", so conditional
+// children must go through here rather than straight into parent.append(...).
+function addKids(parent, ...kids) {
+  for (const k of kids.flat()) {
+    if (k === null || k === undefined || k === false) continue;
+    parent.appendChild((typeof k === 'string' || typeof k === 'number') ? document.createTextNode(String(k)) : k);
+  }
+  return parent;
+}
 const SVG_NS = 'http://www.w3.org/2000/svg';
 function svgEl(tag, attrs) { const n = document.createElementNS(SVG_NS, tag); for (const [k, v] of Object.entries(attrs || {})) n.setAttribute(k, v); return n; }
 function svgIcon(d, size) {
@@ -679,7 +688,7 @@ function renderProductCard(container, product, { source, onAdded, barcode }) {
   const total = el('div', { class: 'note' });
   const refreshTotal = () => { const t = scalePer(per, servings); clear(total); total.append('= ' + fmtK(t.kcal) + ' kcal · P ' + fmtG(t.protein) + ' · C ' + fmtG(t.carbs) + ' · F ' + fmtG(t.fat) + (t.fiber ? ' · fiber ' + fmtG(t.fiber) : '')); };
   let gramsIn = null;
-  const st = stepper({ value: 1, onChange: (v) => { servings = v; if (gramsIn) gramsIn.value = grams ? fmtG(grams * v) : ''; refreshTotal(); } });
+  const st = stepper({ value: 1, min: 0.05, onChange: (v) => { servings = v; if (gramsIn) gramsIn.value = grams ? fmtG(grams * v) : ''; refreshTotal(); } });
   const mealSel = mealSelect(meal); mealSel.addEventListener('change', () => { meal = mealSel.value; });
   const ctxSel = contextSelect(context); ctxSel.addEventListener('change', () => { context = ctxSel.value; });
   if (grams) {
@@ -696,6 +705,7 @@ function renderProductCard(container, product, { source, onAdded, barcode }) {
       el('div', { class: 'pname', text: product.name }),
       product.brand ? el('div', { class: 'pbrand', text: product.brand }) : null,
       el('div', { class: 'pserv', text: 'Per ' + ((product.serving && product.serving.label) || '1 serving') + ': ' + fmtK(per.kcal) + ' kcal' }),
+      (product.serving && product.serving.unknown) ? el('div', { class: 'pserv', style: 'color:var(--warn);font-weight:600', text: 'No serving size on file — these are per 100 g. Enter the grams you ate below.' }) : null,
       macroText(per, 1, true),
       product.per100 && per.kcal ? el('div', { class: 'pserv', text: 'Per 100 g: ' + fmtK(product.per100.kcal) + ' kcal · P ' + fmtG(product.per100.protein) + ' · C ' + fmtG(product.per100.carbs) + ' · F ' + fmtG(product.per100.fat) }) : null));
   const addBtn = el('button', { class: 'btn primary', type: 'button', text: 'Add to log', onclick: () => {
@@ -706,7 +716,7 @@ function renderProductCard(container, product, { source, onAdded, barcode }) {
   } });
   refreshTotal();
   clear(container);
-  container.append(card, controls, total, addBtn);
+  addKids(container, card, controls, total, addBtn);
 }
 
 /* ---------- Estimate results: several items from a photo or a description ---------- */
@@ -765,7 +775,7 @@ function renderEstimateResults(container, result, { source, onAdded, barcode, wh
     if (onAdded) onAdded();
   });
   refreshBtn();
-  container.append(list, result.notes ? el('div', { class: 'note', text: result.notes }) : null,
+  addKids(container, list, result.notes ? el('div', { class: 'note', text: result.notes }) : null,
     whenField,
     el('div', { class: 'grid-2', style: 'margin-top:10px' }, el('div', { class: 'field' }, el('label', { text: 'Meal' }), mealSel), el('div', { class: 'field' }, el('label', { text: 'Context' }), ctxSel)),
     addBtn);
@@ -810,7 +820,8 @@ function normalizeOFF(p, code) {
   } else if (per100.kcal != null && grams) {
     serving = { label: p.serving_size || (grams + ' g'), grams }; per = fillPer(scalePer(per100, grams / 100));
   } else if (per100.kcal != null) {
-    serving = { label: '100 g', grams: 100 }; per = fillPer(per100);
+    // No serving size on file, so these numbers are per 100 g. Flagged so the card can say so.
+    serving = { label: '100 g', grams: 100, unknown: true }; per = fillPer(per100);
   } else return null;
   return {
     name: p.product_name_en || p.product_name || ('Product ' + code),
@@ -1220,7 +1231,7 @@ function renderHowlersSettings(box) {
     Store.set('howlers', { gistId, token, playerId: '' }); await doRefresh();
   } });
   status.textContent = 'Not connected. On a phone that also runs The Howlers, Fuel picks up its Gist keys automatically; otherwise paste them here.';
-  box.append(status, el('div', { class: 'field' }, idIn), el('div', { class: 'field' }, tokIn), connect);
+  addKids(box, status, el('div', { class: 'field' }, idIn), el('div', { class: 'field' }, tokIn), connect);
 }
 
 /* =====================================================================
@@ -1609,7 +1620,7 @@ function renderCustomTab(pane, prefill) {
     if (product.barcode) FoodDB.rememberProduct(product);
     render(); toast('Logged ' + n); closeSheet();
   } });
-  pane.append(barcodeNote,
+  addKids(pane, barcodeNote,
     el('div', { class: 'field' }, el('label', { text: 'Name' }), name),
     el('div', { class: 'grid-2' }, el('div', { class: 'field' }, el('label', { text: 'Brand' }), brand), el('div', { class: 'field' }, el('label', { text: 'Serving size' }), servLabel)),
     el('div', { class: 'grid-2' }, el('div', { class: 'field' }, el('label', { text: 'Calories / serving' }), kcal), el('div', { class: 'field' }, el('label', { text: 'Grams / serving' }), grams)),
@@ -1631,27 +1642,76 @@ function openEditSheet(id) {
   const carb = numInput({ value: fmtG(e.per.carbs), 'aria-label': 'Carbs' });
   const fat = numInput({ value: fmtG(e.per.fat), 'aria-label': 'Fat' });
   const fiber = numInput({ value: fmtG(e.per.fiber || 0), 'aria-label': 'Fiber' });
+  const gramsIn = numInput({ value: e.serving.grams ? fmtG(e.serving.grams) : '', placeholder: 'optional', 'aria-label': 'Grams per serving' });
+  const eatenIn = numInput({ placeholder: 'optional', 'aria-label': 'Grams eaten' });
   let servings = e.servings, meal = e.meal, context = e.context || 'home';
   const sel = mealSelect(meal); sel.addEventListener('change', () => { meal = sel.value; });
   const ctxSel = contextSelect(context); ctxSel.addEventListener('change', () => { context = ctxSel.value; });
-  const st = stepper({ value: servings, step: 0.25, min: 0.25, onChange: (v) => { servings = v; } });
+
+  const FIELDS = { kcal, protein: pro, carbs: carb, fat, fiber };
+  const readPer = () => ({ kcal: numVal(kcal), protein: numVal(pro), carbs: numVal(carb), fat: numVal(fat), fiber: numVal(fiber) });
+  const writePer = (v) => { kcal.value = fmtK(v.kcal).replace(/,/g, ''); pro.value = fmtG(v.protein); carb.value = fmtG(v.carbs); fat.value = fmtG(v.fat); fiber.value = fmtG(v.fiber); };
+  const readout = el('div', { class: 'note' });
+  let syncing = false;
+  const refresh = () => {
+    const per = readPer(), g = numVal(gramsIn, 0);
+    const bits = [fmtServ(servings) + (servings === 1 ? ' serving' : ' servings') + ' = ' + fmtK(per.kcal * servings) + ' kcal'];
+    if (g > 0) bits.push('per 100 g: ' + fmtK(per.kcal * 100 / g) + ' kcal');
+    readout.textContent = bits.join('  ·  ');
+    if (!syncing) { syncing = true; eatenIn.value = g > 0 ? fmtG(g * servings) : ''; syncing = false; }
+  };
+  const st = stepper({ value: servings, step: 0.25, min: 0.05, onChange: (v) => { servings = v; refresh(); } });
+
+  // Nutrition scales with weight, so correcting the gram weight rescales the numbers with it.
+  // The base is captured on focus so typing "2" then "8" scales from the original, not from itself.
+  let base = null;
+  gramsIn.addEventListener('focus', () => {
+    const g = numVal(gramsIn, 0);
+    base = g > 0 ? { grams: g, per: readPer(), eaten: g * servings } : null;
+  });
+  gramsIn.addEventListener('input', () => {
+    const g = numVal(gramsIn, 0);
+    if (base && g > 0) {
+      writePer(scalePer(base.per, g / base.grams));
+      // You ate what you ate. Fixing the serving weight is a correction to the label,
+      // not to the meal, so the portion follows and the day's total holds steady.
+      syncing = true;
+      servings = Math.max(0.05, Math.round((base.eaten / g) * 100) / 100);
+      st.setValue(servings);
+      syncing = false;
+      // Keep a plain "100 g" label honest, but never overwrite one the user wrote
+      // themselves, like "1.5 cup (39 g)".
+      if (/^\s*\d+(\.\d+)?\s*g\s*$/i.test(servLabel.value)) servLabel.value = fmtG(g) + ' g';
+    }
+    refresh();
+  });
+  gramsIn.addEventListener('blur', () => { base = null; refresh(); });
+  eatenIn.addEventListener('input', () => {
+    if (syncing) return;
+    const g = numVal(gramsIn, 0), eaten = numVal(eatenIn, 0);
+    if (g > 0 && eaten > 0) { syncing = true; servings = Math.round((eaten / g) * 100) / 100; st.setValue(servings); syncing = false; refresh(); }
+  });
+  Object.values(FIELDS).forEach(i => i.addEventListener('input', () => refresh()));
   const save = el('button', { class: 'btn primary', type: 'button', text: 'Save', onclick: () => {
-    updateEntry(id, { name: name.value.trim() || e.name, brand: brand.value.trim(), serving: { label: servLabel.value.trim() || '1 serving', grams: e.serving.grams }, per: cleanPer({ kcal: numVal(kcal), protein: numVal(pro), carbs: numVal(carb), fat: numVal(fat), fiber: numVal(fiber) }), servings, meal, context });
+    updateEntry(id, { name: name.value.trim() || e.name, brand: brand.value.trim(), serving: { label: servLabel.value.trim() || '1 serving', grams: numVal(gramsIn, 0) || null }, per: cleanPer(readPer()), servings, meal, context });
     render(); toast('Saved'); closeSheet();
   } });
   const del = el('button', { class: 'btn danger', type: 'button', text: 'Delete', onclick: () => {
     showModal({ title: 'Delete entry?', message: e.name + ' will be removed from ' + AZ.pretty(e.date) + '.', confirmText: 'Delete', cancelText: 'Keep', danger: true, onConfirm: () => { deleteEntry(id); render(); toast('Deleted'); closeSheet(); } });
   } });
-  s.body.append(
+  addKids(s.body,
     el('div', { class: 'field' }, el('label', { text: 'Name' }), name),
     el('div', { class: 'grid-2' }, el('div', { class: 'field' }, el('label', { text: 'Brand' }), brand), el('div', { class: 'field' }, el('label', { text: 'Serving size' }), servLabel)),
-    el('div', { class: 'grid-2', style: 'align-items:end' }, el('div', { class: 'field' }, el('label', { text: 'Servings' }), st), el('div', { class: 'field' }, el('label', { text: 'Meal' }), sel)),
-    el('div', { class: 'field' }, el('label', { text: 'Context' }), ctxSel),
-    el('div', { class: 'note', text: 'Per serving:' }),
-    el('div', { class: 'grid-4' }, el('div', { class: 'field' }, el('label', { text: 'kcal' }), kcal), el('div', { class: 'field' }, el('label', { text: 'Protein' }), pro), el('div', { class: 'field' }, el('label', { text: 'Carbs' }), carb), el('div', { class: 'field' }, el('label', { text: 'Fat' }), fat)),
-    el('div', { class: 'grid-2' }, el('div', { class: 'field' }, el('label', { text: 'Fiber' }), fiber), el('div')),
+    el('div', { class: 'grid-2', style: 'align-items:end' }, el('div', { class: 'field' }, el('label', { text: 'Servings' }), st), el('div', { class: 'field' }, el('label', { text: 'Or grams eaten' }), eatenIn)),
+    el('div', { class: 'grid-2' }, el('div', { class: 'field' }, el('label', { text: 'Meal' }), sel), el('div', { class: 'field' }, el('label', { text: 'Context' }), ctxSel)),
+    el('div', { class: 'note', text: 'One serving is:' }),
+    el('div', { class: 'grid-2' }, el('div', { class: 'field' }, el('label', { text: 'Grams' }), gramsIn), el('div', { class: 'field' }, el('label', { text: 'Calories' }), kcal)),
+    el('div', { class: 'grid-4' }, el('div', { class: 'field' }, el('label', { text: 'Protein' }), pro), el('div', { class: 'field' }, el('label', { text: 'Carbs' }), carb), el('div', { class: 'field' }, el('label', { text: 'Fat' }), fat), el('div', { class: 'field' }, el('label', { text: 'Fiber' }), fiber)),
+    el('div', { class: 'note', style: 'color:var(--ink-dim)', text: 'Change the grams and the numbers rescale with them.' }),
+    readout,
     e.note ? el('div', { class: 'note', text: 'Note: ' + e.note }) : null,
     el('div', { class: 'btn-row' }, del, save));
+  refresh();
 }
 
 /* ---------- Backup & restore ----------
