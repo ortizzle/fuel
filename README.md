@@ -80,3 +80,13 @@ GitHub Pages serves `main` directly, like the other ortizzle apps. One-time setu
 ## Roadmap
 
 Recents / favorites / saved meals → training-day targets (more carbs on long-run days, driven by the Howlers hook) → Gist sync with the canonical safe-merge → weekly review → service worker for offline shell → Strava or Garmin export as the workout source after January.
+
+**Parked: weight as an outcome measure.** Not a daily weigh-in, which Chris does not want and
+which is mostly noise anyway. The point is closing the loop: with intake already logged and
+workouts already read from The Howlers, two weight readings roughly a month apart are enough
+to derive actual maintenance calories (about 3,500 kcal per pound of change) and say whether
+the calorie target is really a deficit. Design notes when it is picked up: weight is a second
+record type alongside `entry`, so it inherits backup, restore-merge and tombstones for free;
+log it from the Log screen rather than Settings, which holds only goal and units; show a
+seven-day average with daily readings faint behind it, and report change as pounds per week
+fitted across the range, never as today versus yesterday.
