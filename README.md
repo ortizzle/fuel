@@ -2,7 +2,7 @@
 
 Personal food log for a phone: scan a barcode, photograph a plate or a Nutrition Facts label, or add by hand; see calories and macros against targets; understand *how* you eat over time (where, when, which meals), with Claude summaries. Built in the ortizzle family-app mold: one `index.html`, no build step, localStorage as the source of truth, Arizona dates. Pixel / Chrome first, Safari still supported.
 
-**Live app:** `https://ortizzle.github.io/fuel/` once this repo is deployed (see *Deploying*).
+**Live app:** https://ortizzle.github.io/fuel/ (after the one-time Pages setting in *Deploying*).
 
 ## Install on the phone
 
@@ -54,12 +54,12 @@ Records carry `id` / `updatedAt` / tombstones, so the canonical Gist safe-merge 
 
 - `index.html` — the whole app (CSS and JS inline; ZXing loads from a CDN only when a browser lacks a native barcode detector).
 - `icon.svg` — the mark used for the favicon and home-screen icon (also inlined in the page).
-- `.github/workflows/pages.yml` — deploys the repo root to GitHub Pages on every push to `main` and enables Pages on first run.
+- `.nojekyll` — tells GitHub Pages to serve the files as they are.
 - `.claude/launch.json` — local run config (`python3 -m http.server 4400`, open `http://localhost:4400/`).
 
 ## Deploying
 
-Push to `main`. The workflow publishes the root to GitHub Pages; the first run enables Pages with "GitHub Actions" as the source (Settings → Pages shows it afterwards). Pages can lag a minute, and Chrome caches hard: verify with `?v=<timestamp>` appended to the URL.
+GitHub Pages serves `main` directly, like the other ortizzle apps. One-time setup: **Settings → Pages → Build and deployment → Source: Deploy from a branch → `main` / `(root)` → Save.** After that every push to `main` goes live within a minute or two. Chrome caches hard: verify a change with `?v=<timestamp>` appended to the URL, or reopen the installed app after a few minutes.
 
 ## Known limits and challenges
 
