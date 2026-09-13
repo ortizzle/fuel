@@ -256,6 +256,7 @@
   .ai-box ul { padding-left: 18px; font-size: 14px; color: var(--ink-mid); }
   .ai-box li { margin: 4px 0; }
   .ai-box .headline { font-weight: 700; font-size: 15px; color: var(--ink); }
+  .ai-box .stale { font-size: 13px; color: var(--warn); margin-top: 12px; padding-left: 10px; border-left: 3px solid var(--warn); }
   .table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 10px; }
   .table th, .table td { text-align: right; padding: 6px 4px; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
   .table th { font-weight: 600; color: var(--ink-dim); }
@@ -606,6 +607,56 @@ function dayTotals(entries) {
   return t;
 }
 
+/* ---------- Saved Claude summaries ----------
+   A day summary used to live only in the DOM, so stepping to another day threw it away.
+   It is a record like any other now, which means it also rides along in backups and merges
+   by updatedAt. Ids are deterministic — one per day, one per insights range — so running it
+   again overwrites instead of piling up, and a fingerprint of what was actually summarized
+   tells us when the food has moved on since. ---------- */
+const SUMMARY_KEEP_DAYS = 90;
+function daySummaryId(date) { return 'sum_day_' + date; }
+function rangeSummaryId(range) { return 'sum_range_' + range; }
+function getSummary(id) { const r = state.data.records[id]; return r && r.type === 'summary' && !r.deleted ? r : null; }
+function dayFingerprint(date) {
+  const es = entriesFor(date);
+  if (!es.length) return '';
+  let last = 0, kcal = 0;
+  for (const e of es) { last = Math.max(last, e.updatedAt || 0); kcal += entryTotals(e).kcal; }
+  return [es.length, Math.round(kcal), last, Howlers.forDate(date).length].join(':');
+}
+function rangeFingerprint(range, S, endDate) {
+  let last = 0, kcal = 0, n = 0;
+  for (const d of S.days) for (const e of d.entries) { last = Math.max(last, e.updatedAt || 0); kcal += entryTotals(e).kcal; n++; }
+  return [range, endDate, n, Math.round(kcal), last].join(':');
+}
+function saveSummary(id, fields) {
+  const prev = state.data.records[id], now = Date.now();
+  pruneSummaries();
+  state.data.records[id] = Object.assign({ id, type: 'summary', createdAt: (prev && prev.createdAt) || now }, fields, { updatedAt: now });
+  saveData();
+}
+function dropSummary(id) {
+  const r = state.data.records[id]; if (!r || r.deleted) return;
+  state.data.records[id] = Object.assign({}, r, { deleted: true, updatedAt: Date.now() });
+  saveData();
+}
+// Summaries untouched for the whole window are commentary on food long out of view. The age
+// is when the summary was written, not the day it covers, so summarizing an old day still
+// keeps it. Dropped outright rather than tombstoned; one restored from an old backup just
+// gets pruned again.
+function pruneSummaries() {
+  const cutoff = Date.now() - SUMMARY_KEEP_DAYS * 86400000;
+  for (const [id, r] of Object.entries(state.data.records)) {
+    if (r && r.type === 'summary' && (r.updatedAt || 0) < cutoff) delete state.data.records[id];
+  }
+}
+function summaryStamp(r) {
+  const at = new Date(r.updatedAt || r.createdAt || Date.now());
+  const day = AZ.dateKey(at), today = AZ.today();
+  const when = day === today ? 'today' : day === AZ.addDays(today, -1) ? 'yesterday' : AZ.pretty(day);
+  return 'Summarized ' + when + ' at ' + prettyTime(AZ.timeHM(at));
+}
+
 /* =====================================================================
    4. Rendering — log view
    ===================================================================== */
@@ -656,11 +707,22 @@ function renderSummary() {
 }
 function renderDayAI() {
   const box = $('day-ai'); clear(box);
-  if (!entriesFor(state.date).length) return;
+  const date = state.date, id = daySummaryId(date), saved = getSummary(id);
+  // No food left on the day, no commentary about it either.
+  if (!entriesFor(date).length) { if (saved) dropSummary(id); return; }
   const out = el('div');
-  const btn = el('button', { class: 'link-btn', type: 'button' }, svgIcon(ICON.spark, 18), 'Summarize ' + (state.date === AZ.today() ? 'today' : 'this day') + ' with Claude');
-  btn.addEventListener('click', () => summarizeDay(state.date, out, btn));
-  box.append(btn, out);
+  if (saved) {
+    const stale = saved.fingerprint !== dayFingerprint(date);
+    const r = saved.result || {};
+    out.appendChild(renderAIBox({ headline: r.headline, paragraphs: [r.summary],
+      lists: [[date === AZ.today() ? 'Ideas for the rest of the day' : 'Ideas Claude had', r.suggestions]],
+      stale: stale ? 'The day has changed since this — summarize again for the current numbers.' : '',
+      stamp: summaryStamp(saved) }));
+  }
+  const label = saved ? 'Summarize again' : 'Summarize ' + (date === AZ.today() ? 'today' : 'this day') + ' with Claude';
+  const btn = el('button', { class: 'link-btn', type: 'button' }, svgIcon(ICON.spark, 18), label);
+  btn.addEventListener('click', () => summarizeDay(date, out, btn));
+  box.append(out, btn);
 }
 function renderWorkoutStrip() {
   const box = $('workout-strip'); clear(box);
@@ -1187,7 +1249,7 @@ function aiErrorMessage(e) {
   if (/Failed to fetch|NetworkError|Load failed/i.test(m)) return 'Could not reach Claude' + (state.preview ? ' (network is blocked in the preview build).' : ' — check your connection.');
   return m.slice(0, 200);
 }
-function renderAIBox({ headline, paragraphs = [], lists = [], footer }) {
+function renderAIBox({ headline, paragraphs = [], lists = [], footer, stamp, stale }) {
   const card = el('div', { class: 'card ai-box' });
   if (headline) card.appendChild(el('div', { class: 'headline', text: String(headline) }));
   for (const p of paragraphs) if (p) card.appendChild(el('p', { text: String(p), style: 'margin-top:6px' }));
@@ -1197,21 +1259,26 @@ function renderAIBox({ headline, paragraphs = [], lists = [], footer }) {
     card.appendChild(el('ul', {}, items.slice(0, 6).map(i => el('li', { text: String(i) }))));
   }
   if (footer) card.appendChild(el('p', { text: String(footer), style: 'margin-top:8px' }));
+  if (stale) card.appendChild(el('div', { class: 'stale', text: String(stale) }));
+  if (stamp) card.appendChild(el('div', { class: 'sub', style: 'margin-top:10px', text: String(stamp) }));
   return card;
 }
 async function summarizeDay(date, out, btn) {
-  clear(out);
-  const st = el('div'); out.appendChild(st); statusLine(st, 'Asking Claude…', 'busy');
+  // The old card stays put under the status line, so a failed re-run does not blank it.
+  const st = el('div'); out.prepend(st); statusLine(st, 'Asking Claude…', 'busy');
   btn.disabled = true;
+  const fingerprint = dayFingerprint(date);
   try {
     const r = await AI.json(dayPrompt(date), { tier: 'quick' });
-    clear(out);
-    out.appendChild(renderAIBox({ headline: r.headline, paragraphs: [r.summary], lists: [['Ideas for the rest of the day', r.suggestions]] }));
+    saveSummary(daySummaryId(date), { kind: 'day', date, fingerprint, model: currentModel(),
+      result: { headline: r.headline || '', summary: r.summary || '', suggestions: listOf(r.suggestions) } });
+    if (state.date === date) renderDayAI(); else st.remove();
   } catch (e) {
     statusLine(st, aiErrorMessage(e), 'err');
     if (String(e && e.message) === 'NO_KEY') out.appendChild(el('button', { class: 'btn ghost', type: 'button', text: 'Open Settings', onclick: () => openSettings() }));
   } finally { btn.disabled = false; }
 }
+function listOf(v) { return Array.isArray(v) ? v.filter(x => x).map(x => String(x)).slice(0, 6) : []; }
 
 /* =====================================================================
    7b. The Howlers — read-only workouts from the Howlers Gist. Both apps live on ortizzle.github.io, so the
@@ -2056,6 +2123,9 @@ function seedSampleDays(n) {
     else add(date, 'dinner', '18:40', pick(['home', 'home', 'home', 'takeout']), pick([F.salmon, F.stirfry, F.pasta, F.salmon, F.leftovers]));
     if (rnd() < 0.5) add(date, 'snack', '21:00', 'home', pick([F.choc, F.cookie, F.apple]));
   }
+  // Opened before the first sample meal of the day, today would otherwise be blank and the
+  // preview would look broken. One coffee at the current hour keeps it a real day.
+  if (!entriesFor(today).length) add(today, 'breakfast', nowHM, 'home', F.coffee, 1);
 }
 
 /* =====================================================================
@@ -2220,19 +2290,28 @@ function renderInsights() {
   // Analysis
   const c7 = el('section', { class: 'card' }, el('h3', { text: 'Analysis' }), el('div', { class: 'sub', text: 'Claude reads the numbers above and points out patterns. Nothing is sent but the aggregates.' }));
   const out = el('div');
-  const btn = el('button', { class: 'btn primary', type: 'button', text: 'Analyze these ' + S.n + ' days', style: 'margin-top:12px' });
+  const sid = rangeSummaryId(range), saved = getSummary(sid), fingerprint = rangeFingerprint(range, S, today);
+  if (saved) {
+    const r = saved.result || {};
+    out.appendChild(renderAIBox({ headline: r.headline, lists: [['Patterns', r.patterns], ['Going well', r.wins], ['Watch', r.watchouts]],
+      footer: r.experiment ? 'Try next week: ' + r.experiment : '',
+      stale: saved.fingerprint !== fingerprint ? 'These ' + range + ' days have moved since this — run it again for the current numbers.' : '',
+      stamp: summaryStamp(saved) }));
+  }
+  const btn = el('button', { class: 'btn primary', type: 'button', text: saved ? 'Analyze again' : 'Analyze these ' + S.n + ' days', style: 'margin-top:12px' });
   btn.addEventListener('click', async () => {
-    clear(out); const st = el('div'); out.appendChild(st); statusLine(st, 'Asking Claude…', 'busy'); btn.disabled = true;
+    const st = el('div'); out.prepend(st); statusLine(st, 'Asking Claude…', 'busy'); btn.disabled = true;
     try {
       const r = await AI.json(rangePrompt(S, range), { tier: 'quick' });
-      clear(out);
-      out.appendChild(renderAIBox({ headline: r.headline, lists: [['Patterns', r.patterns], ['Going well', r.wins], ['Watch', r.watchouts]], footer: r.experiment ? 'Try next week: ' + r.experiment : '' }));
+      saveSummary(sid, { kind: 'range', range, endDate: today, fingerprint, model: currentModel(),
+        result: { headline: r.headline || '', patterns: listOf(r.patterns), wins: listOf(r.wins), watchouts: listOf(r.watchouts), experiment: r.experiment ? String(r.experiment) : '' } });
+      if (state.view === 'insights' && (state.insightsRange || 7) === range) renderInsights(); else st.remove();
     } catch (e) {
       statusLine(st, aiErrorMessage(e), 'err');
       if (String(e && e.message) === 'NO_KEY') out.appendChild(el('button', { class: 'btn ghost', type: 'button', text: 'Open Settings', onclick: () => openSettings() }));
     } finally { btn.disabled = false; }
   });
-  c7.append(btn, out);
+  c7.append(out, btn);
   box.appendChild(c7);
 }
 
@@ -2286,7 +2365,7 @@ function init() {
   AI.init();
   if (Howlers.connected()) Howlers.refresh(false).then(() => { renderWorkoutStrip(); if (state.view === 'insights') renderInsights(); }).catch(() => {});
 }
-window.Fuel = { state, AZ, Store, Howlers, recentFoods, savedMeals, saveMealFrom, deleteSavedMeal, logSavedMeal, photoTimestamp, parseExifDate, guessMeal, defaultContext, addEntry, updateEntry, deleteEntry, entriesFor, dayTotals, computeStats, render, renderInsights, showView, Scanner, FoodDB, AI, parseEstimate, parseJSONLoose, normalizeOFF, normalizeUSDA, normalizeBarcode, upcEToA, codeVariants, openScanSheet, openPhotoSheet, openAddSheet, openEditSheet, openSettings, seedSampleDays, applyScheme, closeSheet, MEALS, CONTEXTS };
+window.Fuel = { state, AZ, Store, Howlers, getSummary, saveSummary, dropSummary, daySummaryId, rangeSummaryId, dayFingerprint, rangeFingerprint, summarizeDay, recentFoods, savedMeals, saveMealFrom, deleteSavedMeal, logSavedMeal, photoTimestamp, parseExifDate, guessMeal, defaultContext, addEntry, updateEntry, deleteEntry, entriesFor, dayTotals, computeStats, render, renderInsights, showView, Scanner, FoodDB, AI, parseEstimate, parseJSONLoose, normalizeOFF, normalizeUSDA, normalizeBarcode, upcEToA, codeVariants, openScanSheet, openPhotoSheet, openAddSheet, openEditSheet, openSettings, seedSampleDays, applyScheme, closeSheet, MEALS, CONTEXTS };
 init();
 })();
 </script>

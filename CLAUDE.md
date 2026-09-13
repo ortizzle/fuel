@@ -68,6 +68,17 @@ letters always sit beside the numbers so identity never depends on colour alone.
   hands back the numbers you just corrected.
 - **Restore merges, never overwrites.** Newest `updatedAt` wins and tombstones are
   respected, so an old backup cannot delete newer entries or resurrect deleted ones.
+- **Claude summaries are records, not DOM.** `render()` rebuilds the whole log view on every
+  date change and every edit, so anything that lives only in a local div is gone the moment
+  you step to another day. Day summaries save as `sum_day_<date>` and range analyses as
+  `sum_range_<7|14|30>` — deterministic ids, so re-running overwrites instead of piling up.
+  Each carries a `fingerprint` of what was actually summarized (entry count, rounded kcal,
+  newest `updatedAt`, workout count); when it no longer matches, the card is marked stale
+  rather than hidden. Summaries untouched for `SUMMARY_KEEP_DAYS` are pruned on the next save
+  — by when they were *written*, not the day they cover, so summarizing an old day still keeps it.
+- **`seedSampleDays` only logs meals that have already happened**, so before the first sample
+  meal of the morning today would be blank. It backfills one coffee at the current time —
+  without that the preview build looks broken at 6am and day counts drift by one.
 
 ## Testing
 

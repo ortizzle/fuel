@@ -26,6 +26,8 @@ Every entry carries a **meal** (Breakfast, Lunch, Dinner, Snack, Pre-workout, Po
 
 **Insights** (7 / 14 / 30 days): calories per day against target, macro averages and split, calories by context, by meal, by time of day, most-logged foods, weekday vs weekend, and, when The Howlers is connected, run days vs rest days. Every chart has a table view and tap-to-read values. "Analyze these days" asks Claude for patterns, wins, watch-outs and one experiment; "Summarize today" does the same for a single day. Only aggregated numbers are sent, never photos.
 
+**Summaries stay put.** What Claude writes is saved with the day it describes, so stepping to another date, closing the app or rebooting the phone all bring it back rather than throwing it away — one summary per day, one analysis per range, each stamped with when it ran. Log something after the fact and the card stays on screen with a note that the day has moved on, so you choose whether to spend another call re-running it. Summaries ride along in backups like everything else, and day summaries older than 90 days are dropped to keep the file small.
+
 **The Howlers hook** (read-only): on a phone that also runs The Howlers, Fuel picks up the Howlers Gist keys from the shared `ortizzle.github.io` storage and shows the day's workout under the ring (run day / training day / rest day), splits Insights into run vs rest days, and tells Claude which days were runs. On another device, paste the Gist ID and token in Settings. Nothing is ever written to the Howlers Gist.
 
 ## The look
@@ -49,6 +51,9 @@ entry = { id, type:'entry', date:'YYYY-MM-DD' (AZ), meal, context, time,
           name, brand, source:'upc'|'photo'|'manual'|'ai'|'quick'|'usda', barcode,
           servings, serving:{ label, grams }, per:{ kcal, protein, carbs, fat, fiber },
           note, createdAt, updatedAt, deleted? }
+savedmeal = { id, type:'savedmeal', name, meal, items:[...], createdAt, updatedAt, deleted? }
+summary  = { id:'sum_day_<date>' | 'sum_range_<7|14|30>', type:'summary', kind:'day'|'range',
+             date | range + endDate, model, fingerprint, result, createdAt, updatedAt, deleted? }
 localStorage fuel_settings  { targets, scheme, model }
 localStorage fuel_products  { <barcode>: product }          remembered scans / custom products
 localStorage fuel_howlers_cache                              workouts by date (read-only mirror)
