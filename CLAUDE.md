@@ -60,6 +60,15 @@ letters always sit beside the numbers so identity never depends on colour alone.
   "null". Use `addKids(parent, ...)` or the `el()` helper, both of which filter.
 - **`updateEntry` mutates the record in place.** Capture any before/after comparison *before*
   calling it, or you will compare a value against itself.
+- **Never write into a field that has focus.** Servings and "grams eaten" drive each other, and
+  normalising the box mid-keystroke swallows a half-typed decimal: "20." becomes "20", so the
+  next key lands as "205" and 20.5 g logs as 205.1 g. Linked fields update each other, never
+  themselves — use `setNum`, which no-ops on `document.activeElement`, and tidy the typed box
+  on `blur` only when it no longer matches the portion.
+- **The stepper keeps three decimals, `fmtServ` shows two.** A portion typed in grams rarely
+  lands on a round fraction of a serving (20.5 g of a 15 g serving is 1.367), and rounding the
+  stored value to 1.37 would read back as 20.6 g. Grams are the honest number; the servings
+  count is a label.
 - **Recents are derived, never stored** — `recentFoods()` folds the log by barcode, or by name
   plus brand when there is none. Saved meals are a second record type, `savedmeal`, so they
   inherit backup, restore-merge and tombstones. Everything that reads the log filters on

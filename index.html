@@ -448,7 +448,9 @@ function stepper({ value, step = 0.5, min = 0.25, max = 50, onChange, format }) 
   let v = value;
   const fmt = format || fmtServ;
   const display = el('span', { class: 'sv', text: fmt(v) });
-  const set = (nv) => { v = Math.min(max, Math.max(min, Math.round(nv * 100) / 100)); display.textContent = fmt(v); onChange(v); };
+  // Three decimals, because a portion typed in grams rarely lands on a round fraction of a
+  // serving: 20.5 g of a 15 g serving is 1.367, and rounding that to 1.37 would read back as 20.6.
+  const set = (nv) => { v = Math.min(max, Math.max(min, Math.round(nv * 1000) / 1000)); display.textContent = fmt(v); onChange(v); return v; };
   const wrap = el('div', { class: 'stepper' },
     el('button', { type: 'button', 'aria-label': 'Less', text: '−', onclick: () => set(v - step) }),
     display,
@@ -458,6 +460,10 @@ function stepper({ value, step = 0.5, min = 0.25, max = 50, onChange, format }) 
 }
 function numInput(attrs) { return el('input', Object.assign({ type: 'text', inputmode: 'decimal', autocomplete: 'off' }, attrs)); }
 function numVal(input, fallback) { const n = parseFloat(String(input.value).replace(/[^0-9.\-]/g, '')); return Number.isFinite(n) ? n : (fallback || 0); }
+// Writing a normalised number into a box while it is being typed in swallows a half-typed
+// decimal: "20." becomes "20", so the next keystroke lands as "205". Linked fields update
+// each other, never themselves — the focused one is left alone until it is done.
+function setNum(input, text) { if (document.activeElement !== input) input.value = text; }
 function titleCase(s) {
   s = String(s || '');
   if (s !== s.toUpperCase()) return s;
@@ -810,12 +816,15 @@ function renderProductCard(container, product, { source, onAdded, barcode, defau
   const total = el('div', { class: 'note' });
   const refreshTotal = () => { const t = scalePer(per, servings); clear(total); total.append('= ' + fmtK(t.kcal) + ' kcal · P ' + fmtG(t.protein) + ' · C ' + fmtG(t.carbs) + ' · F ' + fmtG(t.fat) + (t.fiber ? ' · fiber ' + fmtG(t.fiber) : '')); };
   let gramsIn = null;
-  const st = stepper({ value: servings, min: 0.05, onChange: (v) => { servings = v; if (gramsIn) gramsIn.value = grams ? fmtG(grams * v) : ''; refreshTotal(); } });
+  const st = stepper({ value: servings, min: 0.05, onChange: (v) => { servings = v; if (gramsIn) setNum(gramsIn, grams ? fmtG(grams * v) : ''); refreshTotal(); } });
   const mealSel = mealSelect(meal); mealSel.addEventListener('change', () => { meal = mealSel.value; });
   const ctxSel = contextSelect(context); ctxSel.addEventListener('change', () => { context = ctxSel.value; });
   if (grams) {
     gramsIn = numInput({ value: fmtG(grams * servings), 'aria-label': 'Grams eaten' });
-    gramsIn.addEventListener('input', () => { const g = numVal(gramsIn, 0); if (g > 0) { servings = Math.round((g / grams) * 100) / 100; st.setValue(servings); } });
+    gramsIn.addEventListener('input', () => { const g = numVal(gramsIn, 0); if (g > 0) servings = st.setValue(g / grams); });
+    // On the way out, tidy up only if what is in the box no longer matches the portion —
+    // a clamped or blank entry gets corrected, a good one is left exactly as typed.
+    gramsIn.addEventListener('blur', () => { const g = numVal(gramsIn, 0); if (!(g > 0) || Math.abs(grams * servings - g) > 0.05) gramsIn.value = fmtG(grams * servings); });
   }
   const controls = el('div', { class: 'grid-2', style: 'align-items:end' },
     el('div', { class: 'field' }, el('label', { text: 'Servings' }), st),
@@ -1867,7 +1876,7 @@ function openEditSheet(id) {
 
   const FIELDS = { kcal, protein: pro, carbs: carb, fat, fiber };
   const readPer = () => ({ kcal: numVal(kcal), protein: numVal(pro), carbs: numVal(carb), fat: numVal(fat), fiber: numVal(fiber) });
-  const writePer = (v) => { kcal.value = fmtK(v.kcal).replace(/,/g, ''); pro.value = fmtG(v.protein); carb.value = fmtG(v.carbs); fat.value = fmtG(v.fat); fiber.value = fmtG(v.fiber); };
+  const writePer = (v) => { setNum(kcal, fmtK(v.kcal).replace(/,/g, '')); setNum(pro, fmtG(v.protein)); setNum(carb, fmtG(v.carbs)); setNum(fat, fmtG(v.fat)); setNum(fiber, fmtG(v.fiber)); };
   const readout = el('div', { class: 'note' });
   let syncing = false;
   const refresh = () => {
@@ -1875,7 +1884,7 @@ function openEditSheet(id) {
     const bits = [fmtServ(servings) + (servings === 1 ? ' serving' : ' servings') + ' = ' + fmtK(per.kcal * servings) + ' kcal'];
     if (g > 0) bits.push('per 100 g: ' + fmtK(per.kcal * 100 / g) + ' kcal');
     readout.textContent = bits.join('  ·  ');
-    if (!syncing) { syncing = true; eatenIn.value = g > 0 ? fmtG(g * servings) : ''; syncing = false; }
+    if (!syncing) { syncing = true; setNum(eatenIn, g > 0 ? fmtG(g * servings) : ''); syncing = false; }
   };
   const st = stepper({ value: servings, step: 0.25, min: 0.05, onChange: (v) => { servings = v; refresh(); } });
 
@@ -1893,12 +1902,11 @@ function openEditSheet(id) {
       // You ate what you ate. Fixing the serving weight is a correction to the label,
       // not to the meal, so the portion follows and the day's total holds steady.
       syncing = true;
-      servings = Math.max(0.05, Math.round((base.eaten / g) * 100) / 100);
-      st.setValue(servings);
+      servings = st.setValue(base.eaten / g);
       syncing = false;
       // Keep a plain "100 g" label honest, but never overwrite one the user wrote
       // themselves, like "1.5 cup (39 g)".
-      if (/^\s*\d+(\.\d+)?\s*g\s*$/i.test(servLabel.value)) servLabel.value = fmtG(g) + ' g';
+      if (/^\s*\d+(\.\d+)?\s*g\s*$/i.test(servLabel.value)) setNum(servLabel, fmtG(g) + ' g');
     }
     refresh();
   });
@@ -1906,7 +1914,11 @@ function openEditSheet(id) {
   eatenIn.addEventListener('input', () => {
     if (syncing) return;
     const g = numVal(gramsIn, 0), eaten = numVal(eatenIn, 0);
-    if (g > 0 && eaten > 0) { syncing = true; servings = Math.round((eaten / g) * 100) / 100; st.setValue(servings); syncing = false; refresh(); }
+    if (g > 0 && eaten > 0) { syncing = true; servings = st.setValue(eaten / g); syncing = false; refresh(); }
+  });
+  eatenIn.addEventListener('blur', () => {
+    const g = numVal(gramsIn, 0), eaten = numVal(eatenIn, 0);
+    if (g > 0 && eaten > 0 && Math.abs(g * servings - eaten) > 0.05) eatenIn.value = fmtG(g * servings);
   });
   Object.values(FIELDS).forEach(i => i.addEventListener('input', () => refresh()));
   const save = el('button', { class: 'btn primary', type: 'button', text: 'Save', onclick: () => {
