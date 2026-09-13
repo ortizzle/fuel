@@ -60,6 +60,9 @@ letters always sit beside the numbers so identity never depends on colour alone.
   "null". Use `addKids(parent, ...)` or the `el()` helper, both of which filter.
 - **`updateEntry` mutates the record in place.** Capture any before/after comparison *before*
   calling it, or you will compare a value against itself.
+- **`.brand` is the app wordmark** (22px, weight 800, scoped to `header.top`). A log entry's
+  brand uses `.ebrand` — the two shared a class name and every brand in the log rendered at
+  wordmark size. Check for collisions before reusing a short class name.
 - **Never write into a field that has focus.** Servings and "grams eaten" drive each other, and
   normalising the box mid-keystroke swallows a half-typed decimal: "20." becomes "20", so the
   next key lands as "205" and 20.5 g logs as 205.1 g. Linked fields update each other, never
