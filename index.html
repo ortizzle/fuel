@@ -349,13 +349,22 @@ const Store = {
   remove(key) { try { localStorage.removeItem(this.ns + key); } catch (e) {} }
 };
 
-function showModal({ title, message, confirmText = 'OK', cancelText = null, onConfirm = null, danger = false }) {
+function showModal({ title, message, confirmText = 'OK', cancelText = null, onConfirm = null, danger = false, input = null }) {
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
   const box = document.createElement('div');
   box.className = 'modal-box';
   const h = document.createElement('h3'); h.textContent = title;
   const p = document.createElement('p'); p.textContent = message;
+  let field = null;
+  if (input) {
+    field = document.createElement('input');
+    field.type = 'text';
+    field.value = input.value || '';
+    field.placeholder = input.placeholder || '';
+    field.setAttribute('aria-label', input.placeholder || title);
+    field.style.marginTop = '14px';
+  }
   const btnRow = document.createElement('div'); btnRow.className = 'modal-buttons';
   if (cancelText) {
     const cancel = document.createElement('button'); cancel.type = 'button';
@@ -366,9 +375,10 @@ function showModal({ title, message, confirmText = 'OK', cancelText = null, onCo
   const ok = document.createElement('button'); ok.type = 'button';
   ok.textContent = confirmText; ok.className = danger ? 'btn-secondary' : 'btn-primary';
   if (danger) ok.style.color = 'var(--danger)';
-  ok.addEventListener('click', () => { overlay.remove(); if (onConfirm) onConfirm(); });
+  ok.addEventListener('click', () => { const v = field ? field.value.trim() : undefined; overlay.remove(); if (onConfirm) onConfirm(v); });
   btnRow.appendChild(ok);
-  box.append(h, p, btnRow);
+  if (field) box.append(h, p, field, btnRow); else box.append(h, p, btnRow);
+  if (field) setTimeout(() => field.focus(), 50);
   overlay.appendChild(box);
   overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
   document.body.appendChild(overlay);
@@ -540,6 +550,56 @@ function entriesFor(date) {
     .sort((a, b) => (mealIndex(a.meal) - mealIndex(b.meal)) || ((a.createdAt || 0) - (b.createdAt || 0)));
 }
 function entryTotals(e) { return scalePer(e.per, e.servings || 1); }
+
+/* ---------- Recents and saved meals ----------
+   Recents are derived from the log rather than stored, so they cannot drift out of
+   step with it and there is nothing extra to sync. ---------- */
+function foodKey(e) {
+  return e.barcode ? 'b:' + e.barcode
+    : 'n:' + String(e.name || '').trim().toLowerCase() + '|' + String(e.brand || '').trim().toLowerCase();
+}
+function recentFoods(limit) {
+  const byKey = new Map();
+  for (const e of Object.values(state.data.records)) {
+    if (!e || e.type !== 'entry' || e.deleted) continue;
+    const k = foodKey(e), at = e.createdAt || 0, seen = byKey.get(k);
+    if (!seen) byKey.set(k, { key: k, name: e.name, brand: e.brand, barcode: e.barcode || null, source: e.source,
+      serving: e.serving, per: e.per, servings: e.servings, context: e.context, lastAt: at, count: 1, per100: null, image: null });
+    else {
+      seen.count++;
+      if (at > seen.lastAt) Object.assign(seen, { name: e.name, brand: e.brand, serving: e.serving, per: e.per,
+        servings: e.servings, context: e.context, source: e.source, lastAt: at });
+    }
+  }
+  return Array.from(byKey.values()).sort((a, b) => b.lastAt - a.lastAt).slice(0, limit || 40);
+}
+function savedMeals() {
+  return Object.values(state.data.records).filter(r => r && r.type === 'savedmeal' && !r.deleted)
+    .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+}
+function saveMealFrom(name, meal, entries) {
+  const id = uid(), now = Date.now();
+  state.data.records[id] = {
+    id, type: 'savedmeal', name: String(name || 'Saved meal').slice(0, 60), meal,
+    items: entries.map(e => ({ name: e.name, brand: e.brand, barcode: e.barcode || null, source: e.source,
+      context: e.context, servings: e.servings, serving: e.serving, per: e.per })),
+    createdAt: now, updatedAt: now
+  };
+  saveData();
+  return id;
+}
+function deleteSavedMeal(id) {
+  const r = state.data.records[id]; if (!r) return;
+  state.data.records[id] = Object.assign({}, r, { deleted: true, updatedAt: Date.now() });
+  saveData();
+}
+function logSavedMeal(sm) {
+  for (const it of sm.items) addEntry({ name: it.name, brand: it.brand, source: it.source || 'quick', barcode: it.barcode || null,
+    servings: it.servings, meal: sm.meal, context: it.context || defaultContext(it.barcode ? 'upc' : (it.source || 'manual')),
+    serving: it.serving, per: it.per });
+  return sm.items.length;
+}
+function itemsKcal(items) { return items.reduce((t, i) => t + (i.per.kcal || 0) * (i.servings || 1), 0); }
 function dayTotals(entries) {
   const t = { kcal: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 };
   for (const e of entries) { const x = entryTotals(e); for (const k in t) t[k] += x[k]; }
@@ -679,8 +739,8 @@ function mealSelect(value) { return el('select', { 'aria-label': 'Meal' }, MEALS
 function contextSelect(value) { return el('select', { 'aria-label': 'Context' }, CONTEXTS.map(([v, l]) => el('option', { value: v, text: l, selected: v === value ? true : null }))); }
 
 /* ---------- Product card: one known food with a serving size → log it ---------- */
-function renderProductCard(container, product, { source, onAdded, barcode }) {
-  let servings = 1, meal = guessMeal(), context = defaultContext(source);
+function renderProductCard(container, product, { source, onAdded, barcode, defaultServings }) {
+  let servings = defaultServings || 1, meal = guessMeal(), context = defaultContext(source);
   const per = cleanPer(product.per);
   const grams = product.serving && Number(product.serving.grams) || null;
   const imgEl = product.image ? el('img', { src: product.image, alt: '' }) : el('div', { class: 'ph' }, svgIcon(ICON.plate, 24));
@@ -688,11 +748,11 @@ function renderProductCard(container, product, { source, onAdded, barcode }) {
   const total = el('div', { class: 'note' });
   const refreshTotal = () => { const t = scalePer(per, servings); clear(total); total.append('= ' + fmtK(t.kcal) + ' kcal · P ' + fmtG(t.protein) + ' · C ' + fmtG(t.carbs) + ' · F ' + fmtG(t.fat) + (t.fiber ? ' · fiber ' + fmtG(t.fiber) : '')); };
   let gramsIn = null;
-  const st = stepper({ value: 1, min: 0.05, onChange: (v) => { servings = v; if (gramsIn) gramsIn.value = grams ? fmtG(grams * v) : ''; refreshTotal(); } });
+  const st = stepper({ value: servings, min: 0.05, onChange: (v) => { servings = v; if (gramsIn) gramsIn.value = grams ? fmtG(grams * v) : ''; refreshTotal(); } });
   const mealSel = mealSelect(meal); mealSel.addEventListener('change', () => { meal = mealSel.value; });
   const ctxSel = contextSelect(context); ctxSel.addEventListener('change', () => { context = ctxSel.value; });
   if (grams) {
-    gramsIn = numInput({ value: fmtG(grams), 'aria-label': 'Grams eaten' });
+    gramsIn = numInput({ value: fmtG(grams * servings), 'aria-label': 'Grams eaten' });
     gramsIn.addEventListener('input', () => { const g = numVal(gramsIn, 0); if (g > 0) { servings = Math.round((g / grams) * 100) / 100; st.setValue(servings); } });
   }
   const controls = el('div', { class: 'grid-2', style: 'align-items:end' },
@@ -1518,18 +1578,108 @@ const QUICK_FOODS = [
   ['Dark chocolate', '1 oz (28 g)', 28, 170, 2, 13, 12, 3]
 ].map(([n, s, g, k, p, c, f, fb]) => ({ name: n, serving: { label: s, grams: g }, per: { kcal: k, protein: p, carbs: c, fat: f, fiber: fb }, brand: '', image: null, source: 'quick' }));
 
-function openAddSheet({ tab = 'quick', prefill } = {}) {
-  const s = openSheet({ title: 'Add food', sub: 'Quick list, describe it, or enter numbers' });
+function openAddSheet({ tab, prefill } = {}) {
+  // Land on Recent once there is something in it, otherwise the built-in list.
+  const start = tab || ((recentFoods(1).length || savedMeals().length) ? 'recent' : 'quick');
+  const s = openSheet({ title: 'Add food', sub: 'What you eat often, or something new' });
   const pane = el('div');
-  const tabs = segControl([['quick', 'Quick add'], ['describe', 'Describe'], ['custom', 'Custom']], tab, (key) => show(key));
+  const tabs = segControl([['recent', 'Recent'], ['quick', 'Quick'], ['describe', 'Describe'], ['custom', 'Custom']], start, (key) => show(key));
   s.body.append(tabs, el('div', { style: 'height:12px' }), pane);
   const show = (key) => {
     clear(pane);
-    if (key === 'quick') renderQuickTab(pane);
+    if (key === 'recent') renderRecentTab(pane, show);
+    else if (key === 'quick') renderQuickTab(pane);
     else if (key === 'describe') renderDescribeTab(pane);
     else renderCustomTab(pane, prefill);
   };
-  show(tab);
+  show(start);
+}
+
+function renderRecentTab(pane, switchTab) {
+  const picked = el('div');
+  const body = el('div');
+  const search = el('input', { type: 'search', placeholder: 'Search what you have logged…', 'aria-label': 'Search your foods', autocomplete: 'off' });
+
+  const openFood = (f) => {
+    // The portion you used last is usually the portion you want again.
+    renderProductCard(picked, f, { source: f.source || 'quick', barcode: f.barcode, defaultServings: f.servings, onAdded: () => closeSheet() });
+    picked.scrollIntoView({ block: 'nearest' });
+  };
+
+  const draw = () => {
+    clear(body);
+    const q = search.value.trim().toLowerCase();
+    const meals = savedMeals().filter(m => !q || m.name.toLowerCase().includes(q));
+    const foods = recentFoods(40).filter(f => !q || (f.name + ' ' + (f.brand || '')).toLowerCase().includes(q));
+
+    if (meals.length) {
+      body.appendChild(el('div', { class: 'note', style: 'margin:4px 0 6px', text: 'Saved meals' }));
+      const list = el('div', { class: 'quick-list' });
+      for (const m of meals) {
+        const row = el('div', { class: 'quick-item', style: 'gap:6px' },
+          el('button', { type: 'button', style: 'flex:1;text-align:left;min-height:44px', onclick: () => {
+            const n = logSavedMeal(m); render(); toast('Added ' + m.name + ' · ' + n + (n === 1 ? ' item' : ' items')); closeSheet();
+          } },
+            el('div', { class: 'qn', text: m.name }),
+            el('div', { class: 'qs', text: mealLabel(m.meal) + ' · ' + m.items.length + (m.items.length === 1 ? ' item · ' : ' items · ') + fmtK(itemsKcal(m.items)) + ' kcal' })),
+          el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Delete ' + m.name, onclick: () => showModal({
+            title: 'Delete this meal?', message: m.name + ' will no longer appear here. Entries you already logged from it are untouched.',
+            confirmText: 'Delete', cancelText: 'Keep', danger: true, onConfirm: () => { deleteSavedMeal(m.id); draw(); toast('Deleted'); }
+          }) }, svgIcon(ICON.close, 18)));
+        list.appendChild(row);
+      }
+      body.appendChild(list);
+    }
+
+    body.appendChild(el('div', { class: 'note', style: 'margin:14px 0 6px', text: 'Recent foods' }));
+    if (!foods.length) {
+      body.appendChild(el('div', { class: 'empty', style: 'padding:20px 12px' },
+        el('h3', { text: q ? 'Nothing matches' : 'Nothing logged yet' }),
+        el('p', { text: q ? 'Try the Quick tab, or scan it.' : 'Anything you log shows up here, so the second time is one tap.' })));
+    } else {
+      const list = el('div', { class: 'quick-list' });
+      for (const f of foods) list.appendChild(el('button', { class: 'quick-item', type: 'button', onclick: () => openFood(f) },
+        el('div', {},
+          el('div', { class: 'qn', text: f.name }),
+          el('div', { class: 'qs', text: (f.brand ? f.brand + ' · ' : '') + fmtServ(f.servings) + ' × ' + f.serving.label + (f.count > 1 ? '  ·  ' + f.count + '×' : '') })),
+        el('div', { class: 'qk', text: fmtK(f.per.kcal * f.servings) + ' kcal' })));
+      body.appendChild(list);
+    }
+
+    // Creating a saved meal lives here, beside where you would use one.
+    const today = entriesFor(state.date);
+    if (today.length) body.appendChild(el('button', { class: 'btn ghost', type: 'button', style: 'margin-top:12px',
+      text: 'Save a meal from ' + (state.date === AZ.today() ? 'today' : AZ.pretty(state.date)), onclick: () => chooseMeal() }));
+  };
+
+  const chooseMeal = () => {
+    clear(body);
+    body.appendChild(el('div', { class: 'note', style: 'margin:4px 0 6px', text: 'Which meal do you want to save?' }));
+    const list = el('div', { class: 'quick-list' });
+    const entries = entriesFor(state.date);
+    let any = false;
+    for (const [key, label] of MEALS) {
+      const group = entries.filter(e => e.meal === key);
+      if (!group.length) continue;
+      any = true;
+      list.appendChild(el('button', { class: 'quick-item', type: 'button', onclick: () => showModal({
+        title: 'Name this meal', message: group.length + (group.length === 1 ? ' item' : ' items') + ' from ' + label + '.',
+        input: { placeholder: 'e.g. My usual breakfast', value: 'My usual ' + label.toLowerCase() },
+        confirmText: 'Save', cancelText: 'Cancel',
+        onConfirm: (nameGiven) => { saveMealFrom(nameGiven || ('My usual ' + label.toLowerCase()), key, group); draw(); toast('Saved'); }
+      }) },
+        el('div', {},
+          el('div', { class: 'qn', text: label }),
+          el('div', { class: 'qs', text: group.map(g => g.name).join(', ').slice(0, 60) })),
+        el('div', { class: 'qk', text: fmtK(group.reduce((t, g) => t + entryTotals(g).kcal, 0)) + ' kcal' })));
+    }
+    if (!any) list.appendChild(el('div', { class: 'note', style: 'padding:12px', text: 'Nothing logged on this day yet.' }));
+    body.append(list, el('button', { class: 'btn ghost', type: 'button', style: 'margin-top:12px', text: 'Back', onclick: () => draw() }));
+  };
+
+  search.addEventListener('input', draw);
+  pane.append(picked, el('div', { class: 'field' }, search), body);
+  draw();
 }
 
 function renderQuickTab(pane) {
@@ -1693,8 +1843,16 @@ function openEditSheet(id) {
   });
   Object.values(FIELDS).forEach(i => i.addEventListener('input', () => refresh()));
   const save = el('button', { class: 'btn primary', type: 'button', text: 'Save', onclick: () => {
-    updateEntry(id, { name: name.value.trim() || e.name, brand: brand.value.trim(), serving: { label: servLabel.value.trim() || '1 serving', grams: numVal(gramsIn, 0) || null }, per: cleanPer(readPer()), servings, meal, context });
-    render(); toast('Saved'); closeSheet();
+    const serving = { label: servLabel.value.trim() || '1 serving', grams: numVal(gramsIn, 0) || null };
+    const per = cleanPer(readPer());
+    const nm = name.value.trim() || e.name, br = brand.value.trim();
+    // updateEntry mutates the record in place, so compare against the old values first.
+    const was = { kcal: e.per.kcal, grams: e.serving.grams || 0, name: e.name };
+    const fixed = !!e.barcode && (per.kcal !== was.kcal || (serving.grams || 0) !== was.grams || nm !== was.name);
+    updateEntry(id, { name: nm, brand: br, serving, per, servings, meal, context });
+    // Otherwise the next scan of this barcode hands back the numbers just corrected.
+    if (e.barcode) FoodDB.rememberProduct({ name: nm, brand: br, barcode: e.barcode, serving, per, per100: null, image: null, source: 'manual' });
+    render(); toast(fixed ? 'Saved — the next scan of this barcode uses these numbers' : 'Saved'); closeSheet();
   } });
   const del = el('button', { class: 'btn danger', type: 'button', text: 'Delete', onclick: () => {
     showModal({ title: 'Delete entry?', message: e.name + ' will be removed from ' + AZ.pretty(e.date) + '.', confirmText: 'Delete', cancelText: 'Keep', danger: true, onConfirm: () => { deleteEntry(id); render(); toast('Deleted'); closeSheet(); } });
@@ -2128,7 +2286,7 @@ function init() {
   AI.init();
   if (Howlers.connected()) Howlers.refresh(false).then(() => { renderWorkoutStrip(); if (state.view === 'insights') renderInsights(); }).catch(() => {});
 }
-window.Fuel = { state, AZ, Store, Howlers, photoTimestamp, parseExifDate, guessMeal, defaultContext, addEntry, updateEntry, deleteEntry, entriesFor, dayTotals, computeStats, render, renderInsights, showView, Scanner, FoodDB, AI, parseEstimate, parseJSONLoose, normalizeOFF, normalizeUSDA, normalizeBarcode, upcEToA, codeVariants, openScanSheet, openPhotoSheet, openAddSheet, openEditSheet, openSettings, seedSampleDays, applyScheme, closeSheet, MEALS, CONTEXTS };
+window.Fuel = { state, AZ, Store, Howlers, recentFoods, savedMeals, saveMealFrom, deleteSavedMeal, logSavedMeal, photoTimestamp, parseExifDate, guessMeal, defaultContext, addEntry, updateEntry, deleteEntry, entriesFor, dayTotals, computeStats, render, renderInsights, showView, Scanner, FoodDB, AI, parseEstimate, parseJSONLoose, normalizeOFF, normalizeUSDA, normalizeBarcode, upcEToA, codeVariants, openScanSheet, openPhotoSheet, openAddSheet, openEditSheet, openSettings, seedSampleDays, applyScheme, closeSheet, MEALS, CONTEXTS };
 init();
 })();
 </script>

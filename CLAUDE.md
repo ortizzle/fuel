@@ -58,6 +58,14 @@ letters always sit beside the numbers so identity never depends on colour alone.
   size on file come back flagged `serving.unknown` with per-100g figures.
 - **Never hand a conditional child to a native `append()`** — it renders the literal text
   "null". Use `addKids(parent, ...)` or the `el()` helper, both of which filter.
+- **`updateEntry` mutates the record in place.** Capture any before/after comparison *before*
+  calling it, or you will compare a value against itself.
+- **Recents are derived, never stored** — `recentFoods()` folds the log by barcode, or by name
+  plus brand when there is none. Saved meals are a second record type, `savedmeal`, so they
+  inherit backup, restore-merge and tombstones. Everything that reads the log filters on
+  `type === 'entry'`, so new record types are additive.
+- **Editing an entry re-remembers the product** behind its barcode, otherwise the next scan
+  hands back the numbers you just corrected.
 - **Restore merges, never overwrites.** Newest `updatedAt` wins and tombstones are
   respected, so an old backup cannot delete newer entries or resurrect deleted ones.
 
