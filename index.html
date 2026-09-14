@@ -94,7 +94,6 @@
   .workout-strip { display: flex; align-items: flex-start; gap: 8px; margin: 10px 4px 0; font-size: 13px; line-height: 1.4; color: var(--ink-mid); }
   .workout-strip > span { min-width: 0; }
   .workout-strip b { white-space: nowrap; }
-  .workout-strip b.in { color: var(--accent); }
   .workout-strip svg { width: 18px; height: 18px; color: var(--move); flex: none; }
   .workout-strip b { color: var(--move); font-weight: 700; }
   .seg.wide { width: 100%; } .seg.wide button { flex: 1; padding: 0 8px; }
@@ -749,10 +748,6 @@ function workoutsFor(date) {
 }
 function workoutName(w) { return w.title || KIND_LABEL[w.kind] || 'Workout'; }
 function profile() { return state.settings.profile; }
-// Energy out comes off energy in on the ring unless the user switches it off. It is the honest
-// accounting for a target built on a sedentary baseline — but burn figures are estimates, and
-// eating them back is the classic way a deficit evaporates, hence the switch.
-function netting() { return state.settings.netMovement !== false; }
 // Calories the source reported, else a MET estimate — which needs a weight, so it stays null
 // (and the UI says so) until one is entered in Settings.
 function workoutKcal(w) {
@@ -805,14 +800,28 @@ function renderHeader() {
   }
 }
 
-function ringSVG(pct) {
+function ringSVG(pct, outPct) {
   const size = 124, stroke = 10;
   const svg = svgEl('svg', { viewBox: '0 0 ' + size + ' ' + size, 'aria-hidden': 'true' });
   const r = (size - stroke) / 2, c = 2 * Math.PI * r, cx = size / 2;
   svg.appendChild(svgEl('circle', { cx, cy: cx, r, fill: 'none', stroke: 'var(--track)', 'stroke-width': stroke }));
   const fill = Math.min(1, Math.max(0, pct));
-  if (fill > 0) svg.appendChild(svgEl('circle', { cx, cy: cx, r, fill: 'none', stroke: pct > 1.05 ? 'var(--danger)' : 'var(--accent)', 'stroke-width': stroke, 'stroke-dasharray': (fill * c) + ' ' + c, 'stroke-linecap': 'round', transform: 'rotate(-90 ' + cx + ' ' + cx + ')' }));
+  if (fill > 0) svg.appendChild(svgEl('circle', { class: 'in', cx, cy: cx, r, fill: 'none', stroke: pct > 1.05 ? 'var(--danger)' : 'var(--accent)', 'stroke-width': stroke, 'stroke-dasharray': (fill * c) + ' ' + c, 'stroke-linecap': 'round', transform: 'rotate(-90 ' + cx + ' ' + cx + ')' }));
+  // Energy out rides inside energy in, on the same scale (the calorie target) but run the other
+  // way round the dial: intake climbs clockwise from the top, burn falls away counter-clockwise,
+  // so the gap between the two ends is the day's deficit. The center stays intake; nothing nets.
+  const r2 = r - stroke - 3, s2 = 6;
+  svg.appendChild(svgEl('circle', { cx, cy: cx, r: r2, fill: 'none', stroke: 'var(--track)', 'stroke-width': s2 }));
+  const f2 = Math.min(1, Math.max(0, outPct || 0));
+  if (f2 >= 1) svg.appendChild(svgEl('circle', { class: 'out', cx, cy: cx, r: r2, fill: 'none', stroke: 'var(--move)', 'stroke-width': s2 }));
+  else if (f2 > 0) svg.appendChild(svgEl('path', { class: 'out', d: arcFromTop(cx, cx, r2, f2, true), fill: 'none', stroke: 'var(--move)', 'stroke-width': s2, 'stroke-linecap': 'round' }));
   return svg;
+}
+// An arc from 12 o'clock covering a fraction of the circle, clockwise or counter-clockwise.
+function arcFromTop(cx, cy, r, frac, ccw) {
+  const a = Math.min(0.9999, Math.max(0, frac)) * 2 * Math.PI, dir = ccw ? -1 : 1;
+  const x = cx + dir * r * Math.sin(a), y = cy - r * Math.cos(a);
+  return 'M ' + cx + ' ' + (cy - r) + ' A ' + r + ' ' + r + ' 0 ' + (a > Math.PI ? 1 : 0) + ' ' + (ccw ? 0 : 1) + ' ' + x.toFixed(2) + ' ' + y.toFixed(2);
 }
 function macroRow(key, label, val, target) {
   const p = target > 0 ? val / target : 0;
@@ -828,16 +837,14 @@ function renderSummary() {
   const entries = entriesFor(state.date);
   const t = dayTotals(entries); const T = state.settings.targets;
   const mv = dayMovement(state.date);
-  const out = netting() ? mv.kcal : 0;
-  const net = t.kcal - out;
-  const pct = T.kcal > 0 ? Math.max(0, net) / T.kcal : 0;
-  // A ride before breakfast leaves net below zero: the ring stays empty and the room grows.
-  const remaining = Math.round(T.kcal - net);
+  // Intake against the target; the burn is drawn as its own ring and never changes these numbers.
+  const pct = T.kcal > 0 ? t.kcal / T.kcal : 0, outPct = T.kcal > 0 ? mv.kcal / T.kcal : 0;
+  const remaining = Math.round(T.kcal - t.kcal);
   const center = el('div', { class: 'ring-center' },
-    el('div', { class: 'big', text: fmtK(Math.max(0, net)) }),
-    el('div', { class: 'small', text: out ? 'net of ' + fmtK(T.kcal) : 'of ' + fmtK(T.kcal) + ' kcal' }),
+    el('div', { class: 'big', text: fmtK(t.kcal) }),
+    el('div', { class: 'small', text: 'of ' + fmtK(T.kcal) + ' kcal' }),
     el('div', { class: 'rem', text: remaining >= 0 ? fmtK(remaining) + ' left' : fmtK(-remaining) + ' over', style: remaining < 0 ? 'color:var(--danger)' : '' }));
-  const ring = el('div', { class: 'ring-wrap', title: out ? fmtK(t.kcal) + ' in · ' + (mv.estimated ? '~' : '') + fmtK(out) + ' out' : null }, ringSVG(pct), center);
+  const ring = el('div', { class: 'ring-wrap', title: mv.kcal ? fmtK(t.kcal) + ' in · ' + (mv.estimated ? '~' : '') + fmtK(mv.kcal) + ' out' : null }, ringSVG(pct, outPct), center);
   const macros = el('div', { class: 'macros' });
   for (const [key, label] of [['protein', 'Protein'], ['carbs', 'Carbs'], ['fat', 'Fat'], ['fiber', 'Fiber']]) macros.appendChild(macroRow(key, label, t[key], Number(T[key]) || 0));
   box.append(ring, macros);
@@ -870,10 +877,9 @@ function renderWorkoutStrip() {
   box.appendChild(svgIcon(ICON[KIND_ICON[m.kinds[0]]] || ICON.run, 18));
   if (!m.n) { box.appendChild(el('span', { text: 'Rest day' })); return; }
   const line = el('span');
-  if (netting() && m.kcal) {
-    const t = dayTotals(entriesFor(state.date));
-    line.append(el('b', { class: 'in', text: fmtK(t.kcal) + ' in' }), ' · ', el('b', { class: 'out', text: (m.estimated ? '~' : '') + fmtK(m.kcal) + ' out' }), ' · Moved ' + m.minutes + ' min · ' + movementLine(m, false));
-  } else line.append(el('b', { text: 'Moved ' + m.minutes + ' min' }), ' · ' + movementLine(m, true));
+  // The blue figure is the inner ring's number; minutes and the workouts follow it.
+  if (m.kcal) line.append(el('b', { class: 'out', text: (m.estimated ? '~' : '') + fmtK(m.kcal) + ' out' }), ' · Moved ' + m.minutes + ' min · ' + movementLine(m, false));
+  else line.append(el('b', { text: 'Moved ' + m.minutes + ' min' }), ' · ' + movementLine(m, true));
   if (m.source === 'howlers') line.append(' · from The Howlers');
   box.appendChild(line);
 }
@@ -1208,7 +1214,7 @@ function dayPrompt(date) {
     (isToday ? 'It is now ' + AZ.timeHM() + ' Arizona time. ' : 'The day is over. ') +
     'Daily targets: ' + T.kcal + ' kcal, protein ' + T.protein + ' g, carbs ' + T.carbs + ' g, fat ' + T.fat + ' g, fiber ' + T.fiber + ' g. ' +
     'Totals so far: ' + Math.round(t.kcal) + ' kcal, protein ' + Math.round(t.protein) + ', carbs ' + Math.round(t.carbs) + ', fat ' + Math.round(t.fat) + ', fiber ' + Math.round(t.fiber) + '. ' +
-    (netting() && mv.kcal ? 'Logged movement burned about ' + mv.kcal + ' kcal, so net intake is ' + Math.round(t.kcal - mv.kcal) + ' kcal against the calorie target. ' : '') +
+    (mv.kcal ? 'Logged movement burned about ' + mv.kcal + ' kcal. The calorie target applies to intake alone; the burn deepens the day\'s deficit rather than adding room to eat. ' : '') +
     (mv.n ? 'Movement this day: ' + mv.items.map(i => (i.title || KIND_LABEL[i.kind]) + (i.minutes ? ' ' + i.minutes + ' min' : '') + (i.miles ? ' ' + fmtG(i.miles) + ' mi' : '') + (workoutKcal(i) ? ' ~' + workoutKcal(i).kcal + ' kcal' : '')).join(', ') + '. ' : 'No movement logged this day. ') +
     (profileContext() ? profileContext() + ' ' : '') + '\nEntries (meal · time · context · item · portion · numbers):\n' + lines.join('\n') +
     '\n\nRespond with ONLY valid JSON, no markdown fences: {"headline":"max 10 words","summary":"2 or 3 sentences on how the day stacks up against the targets, citing the numbers","suggestions":["up to 3 short, concrete ideas for the rest of the day; an empty array if the day is over or already on track"]}';
@@ -1218,7 +1224,7 @@ function rangePrompt(S, range) {
   const compact = {
     days: S.days.map(d => ({ date: d.date, weekday: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][AZ.weekday(d.date)], kcal: r(d.totals.kcal), kcalOut: r(d.out), kcalNet: r(d.net), protein: r(d.totals.protein), carbs: r(d.totals.carbs), fat: r(d.totals.fat), fiber: r(d.totals.fiber), entries: d.entries.length })),
     targets: S.targets, daysLogged: S.n, daysWithin10pct: S.kcalHit, daysOver: S.overDays, daysProteinTargetMet: S.proteinHit,
-    averages: { kcal: r(S.avg.kcal), protein: r(S.avg.protein), carbs: r(S.avg.carbs), fat: r(S.avg.fat), fiber: r(S.avg.fiber) },
+    averages: { kcal: r(S.avg.kcal), kcalOut: r(S.avgOut), kcalNet: r(S.avgNet), protein: r(S.avg.protein), carbs: r(S.avg.carbs), fat: r(S.avg.fat), fiber: r(S.avg.fiber) },
     calorieSplit: { protein: r(S.split.protein * 100), carbs: r(S.split.carbs * 100), fat: r(S.split.fat * 100) },
     byContext: S.contexts.map(c => ({ context: c.label, entries: c.count, kcal: r(c.kcal), sharePct: r(c.share * 100), avgPerEntry: r(c.avg) })),
     byMeal: S.meals.map(m => ({ meal: m.label, entries: m.count, sharePct: r(m.share * 100), avgPerDay: r(m.perDay) })),
@@ -1227,7 +1233,7 @@ function rangePrompt(S, range) {
     weekdayAvgKcal: r(S.weekday), weekendAvgKcal: r(S.weekend),
     training: S.hasWorkouts ? { activeDays: S.training.active.n, restDays: S.training.rest.n, activeDayAvg: { kcal: r(S.training.active.kcal), protein: r(S.training.active.protein), carbs: r(S.training.active.carbs) }, restDayAvg: { kcal: r(S.training.rest.kcal), protein: r(S.training.rest.protein), carbs: r(S.training.rest.carbs) }, totalMinutes: r(S.movement.totalMinutes), minutesByKind: S.movement.byKind.map(b => ({ kind: b.label, minutes: r(b.minutes) })), activeDates: S.movement.days.filter(m => m.n).map(m => m.date) } : null
   };
-  return 'You are reviewing ' + range + ' days of a personal food and movement log (Arizona). The user wants to understand how and what they eat, not just the macros. Photo and text entries are estimates. ' + (netting() ? 'kcalNet is intake minus logged movement and is what the daily calorie target applies to; kcal is intake alone. ' : '') + (profileContext() ? profileContext() + ' ' : '') + 'If "training" is present, compare fueling on active days vs rest days. Data (JSON):\n' + JSON.stringify(compact) +
+  return 'You are reviewing ' + range + ' days of a personal food and movement log (Arizona). The user wants to understand how and what they eat, not just the macros. Photo and text entries are estimates. ' + (S.anyOut ? 'kcal is intake, which the daily calorie target applies to; kcalOut is the estimated burn from logged movement and kcalNet is intake minus it — extra deficit, not room to eat. ' : '') + (profileContext() ? profileContext() + ' ' : '') + 'If "training" is present, compare fueling on active days vs rest days. Data (JSON):\n' + JSON.stringify(compact) +
     '\n\nWrite for the user in second person. Be specific and grounded in these numbers, no generic advice, no medical claims. Respond with ONLY valid JSON, no markdown fences: {"headline":"one line, max 12 words","patterns":["3 to 5 observations about how and what they eat, each citing numbers"],"wins":["1 to 3 things going well"],"watchouts":["1 to 3 things to watch, each with a number"],"experiment":"one concrete thing to try next week"}';
 }
 function parseJSONLoose(raw) {
@@ -2468,8 +2474,6 @@ function openSettings() {
   pelIn.addEventListener('change', async () => { const f = pelIn.files && pelIn.files[0]; pelIn.value = ''; if (f) await importPelotonFile(f); });
   const howlImport = Howlers.connected() && Howlers.cache() ? el('button', { class: 'btn', type: 'button', text: 'Import Howlers history', onclick: () => { const r = importFromHowlers(); render(); toast(r.added ? 'Imported ' + r.added + ' workouts' + (r.already ? ' · ' + r.already + ' already here' : '') : 'Nothing new to import'); } }) : null;
   const workoutCount = Object.values(state.data.records).filter(r => r.type === 'workout' && !r.deleted).length;
-  const netCb = el('input', { type: 'checkbox', checked: netting() ? true : null, 'aria-label': 'Count movement against the day' });
-  netCb.addEventListener('change', () => { state.settings.netMovement = netCb.checked; saveSettings(); renderSummary(); renderWorkoutStrip(); if (state.view === 'insights') renderInsights(); });
   Object.values(tIn).forEach(i => i.addEventListener('change', saveTargets));
   const scheme = segControl([['system', 'System'], ['light', 'Light'], ['dark', 'Dark']], state.settings.scheme || 'system', (v) => applyScheme(v));
   const modelSel = el('select', { 'aria-label': 'Claude model' }, MODELS.map(([v, l]) => el('option', { value: v, text: l, selected: v === currentModel() ? true : null })));
@@ -2503,9 +2507,7 @@ function openSettings() {
       el('div', { class: 'grid-3' }, el('div', { class: 'field' }, el('label', { text: 'Calories' }), tIn.kcal), el('div', { class: 'field' }, el('label', { text: 'Fiber g' }), tIn.fiber), el('div', { class: 'field' }, el('label', { text: 'Move min' }), tIn.move)),
       el('div', { class: 'grid-3' }, el('div', { class: 'field' }, el('label', { text: 'Protein g' }), tIn.protein), el('div', { class: 'field' }, el('label', { text: 'Carbs g' }), tIn.carbs), el('div', { class: 'field' }, el('label', { text: 'Fat g' }), tIn.fat)),
       el('button', { class: 'btn', type: 'button', text: 'Set targets from a goal', style: 'margin-top:4px', onclick: () => openTargetsSheet() }),
-      el('div', { class: 'note' }, 'Weight, height and age give an estimate of what you burn in a day; pick a deficit and the macros follow, with the reasoning shown.'),
-      el('div', { class: 'checks', style: 'grid-template-columns:1fr;margin-top:4px' }, el('label', { class: 'check' }, netCb, 'Count movement against the day')),
-      el('div', { class: 'note', style: 'margin-top:0' }, 'On, the ring shows what you ate minus what you burned, so a ride earns room. Off, the ring is food alone. Burn figures are estimates — the bike\'s are fair, walks are rough — so if you catch yourself eating them back, switch this off.')),
+      el('div', { class: 'note' }, 'Weight, height and age give an estimate of what you burn in a day; pick a deficit and the macros follow, with the reasoning shown.')),
     el('div', { class: 'field' }, el('label', { text: 'Appearance' }), scheme),
     el('div', { class: 'field', style: 'margin-top:16px' }, el('label', { text: 'Claude API key (photos, descriptions, summaries)' }), keyRow,
       el('div', { class: 'note', text: AI.mode() === 'preview' ? 'This preview supplies AI itself; a key is only needed in the deployed app.' : 'Stored only in this browser. Calls go straight from your phone to Anthropic — nothing passes through a server.' })),
@@ -2606,23 +2608,23 @@ function hourBucket(time) {
 }
 function computeStats(days) {
   const T = state.settings.targets;
-  // Net of movement when netting is on; intake is kept alongside because context and meal
-  // shares are shares of what was eaten, not of the balance.
-  const perDay = days.map(d => { const es = entriesFor(d); const totals = dayTotals(es); const mv = dayMovement(d); const out = netting() ? mv.kcal : 0; return { date: d, entries: es, totals, logged: es.length > 0, mv, out, net: totals.kcal - out }; });
+  // Intake is what every target check measures; the burn (out) and intake minus it (net) ride
+  // along per day for the table and the prompts, so the deficit is visible without netting anything.
+  const perDay = days.map(d => { const es = entriesFor(d); const totals = dayTotals(es); const mv = dayMovement(d); const out = mv.kcal || 0; return { date: d, entries: es, totals, logged: es.length > 0, mv, out, net: totals.kcal - out }; });
   const logged = perDay.filter(x => x.logged); const n = logged.length;
   const sum = { kcal: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 };
   logged.forEach(x => { for (const k in sum) sum[k] += x.totals[k]; });
   const avg = {}; for (const k in sum) avg[k] = n ? sum[k] / n : 0;
-  const avgNet = n ? logged.reduce((s, x) => s + x.net, 0) / n : 0;
+  const avgOut = n ? logged.reduce((s, x) => s + x.out, 0) / n : 0, avgNet = n ? logged.reduce((s, x) => s + x.net, 0) / n : 0;
   const anyOut = perDay.some(x => x.out > 0);
-  const kcalHit = logged.filter(x => Math.abs(x.net - T.kcal) <= T.kcal * 0.1).length;
-  const overDays = logged.filter(x => x.net > T.kcal * 1.1).length;
+  const kcalHit = logged.filter(x => Math.abs(x.totals.kcal - T.kcal) <= T.kcal * 0.1).length;
+  const overDays = logged.filter(x => x.totals.kcal > T.kcal * 1.1).length;
   const proteinHit = logged.filter(x => x.totals.protein >= T.protein).length;
   const byContext = {}, byMeal = {}, byHour = new Array(7).fill(0), foods = {};
   let weekdayK = 0, weekdayN = 0, weekendK = 0, weekendN = 0;
   for (const d of logged) {
     const dow = AZ.weekday(d.date);
-    if (dow === 0 || dow === 6) { weekendK += d.net; weekendN++; } else { weekdayK += d.net; weekdayN++; }
+    if (dow === 0 || dow === 6) { weekendK += d.totals.kcal; weekendN++; } else { weekdayK += d.totals.kcal; weekdayN++; }
     for (const e of d.entries) {
       const t = entryTotals(e);
       const c = CONTEXTS.some(x => x[0] === e.context) ? e.context : 'other';
@@ -2653,7 +2655,7 @@ function computeStats(days) {
   const restDays = logged.filter(d => mvOf[d.date].n === 0);
   const avgOf = (arr, k) => arr.length ? arr.reduce((s, d) => s + d.totals[k], 0) / arr.length : 0;
   const training = { active: { n: activeDays.length, kcal: avgOf(activeDays, 'kcal'), protein: avgOf(activeDays, 'protein'), carbs: avgOf(activeDays, 'carbs') }, rest: { n: restDays.length, kcal: avgOf(restDays, 'kcal'), protein: avgOf(restDays, 'protein'), carbs: avgOf(restDays, 'carbs') } };
-  return { days: perDay, n, avg, kcalHit, overDays, proteinHit, contexts, meals, hours, topFoods, split: { protein: pk / mk, carbs: ck / mk, fat: fk / mk }, weekday: weekdayN ? weekdayK / weekdayN : 0, weekend: weekendN ? weekendK / weekendN : 0, targets: T, hasWorkouts, activeDays, restDays, training, movement, avgNet, anyOut };
+  return { days: perDay, n, avg, kcalHit, overDays, proteinHit, contexts, meals, hours, topFoods, split: { protein: pk / mk, carbs: ck / mk, fat: fk / mk }, weekday: weekdayN ? weekdayK / weekdayN : 0, weekend: weekendN ? weekendK / weekendN : 0, targets: T, hasWorkouts, activeDays, restDays, training, movement, avgOut, avgNet, anyOut };
 }
 function niceStep(max) {
   const raw = Math.max(1, max) / 3; const pow = Math.pow(10, Math.floor(Math.log10(raw))); const f = raw / pow;
@@ -2723,15 +2725,16 @@ function renderInsights() {
     return;
   }
   // Calories per day
-  const c1 = el('section', { class: 'card' }, el('h3', { text: 'Calories per day' }), el('div', { class: 'sub', text: S.n + ' of ' + days.length + ' days logged · target ' + fmtK(S.targets.kcal) + ' kcal' + (S.anyOut ? ' · net of movement' : '') }));
-  c1.appendChild(el('div', { class: 'stats' }, stat(fmtK(S.avgNet), S.anyOut ? 'avg net kcal per day' : 'avg kcal per day'), stat(S.kcalHit + ' / ' + S.n, 'days within 10%'), stat(String(S.overDays), 'days over')));
+  const c1 = el('section', { class: 'card' }, el('h3', { text: 'Calories per day' }), el('div', { class: 'sub', text: S.n + ' of ' + days.length + ' days logged · target ' + fmtK(S.targets.kcal) + ' kcal' }));
+  c1.appendChild(el('div', { class: 'stats' }, stat(fmtK(S.avg.kcal), 'avg kcal per day'), stat(S.kcalHit + ' / ' + S.n, 'days within 10%'), stat(String(S.overDays), 'days over')));
   const chart1 = el('div', { class: 'chart' }); c1.appendChild(chart1);
   c1.appendChild(S.anyOut
-    ? tableToggle(S.days.map(d => [AZ.pretty(d.date), d.logged ? fmtK(d.totals.kcal) : '—', d.out ? '~' + fmtK(d.out) : '—', d.logged ? fmtK(d.net) : '—', d.logged ? fmtG(d.totals.protein) : '—', d.logged ? fmtG(d.totals.carbs) : '—', d.logged ? fmtG(d.totals.fat) : '—']), ['Day', 'in', 'out', 'net', 'P', 'C', 'F'])
+    ? tableToggle(S.days.map(d => [AZ.pretty(d.date), d.logged ? fmtK(d.totals.kcal) : '—', d.out ? (d.mv.estimated ? '~' : '') + fmtK(d.out) : '—', d.logged ? fmtK(d.net) : '—', d.logged ? fmtG(d.totals.protein) : '—', d.logged ? fmtG(d.totals.carbs) : '—', d.logged ? fmtG(d.totals.fat) : '—']), ['Day', 'in', 'out', 'net', 'P', 'C', 'F'])
     : tableToggle(S.days.map(d => [AZ.pretty(d.date), d.logged ? fmtK(d.totals.kcal) : '—', d.logged ? fmtG(d.totals.protein) : '—', d.logged ? fmtG(d.totals.carbs) : '—', d.logged ? fmtG(d.totals.fat) : '—']), ['Day', 'kcal', 'P', 'C', 'F']));
+  if (S.anyOut) c1.appendChild(el('div', { class: 'note', text: 'Movement burned about ' + fmtK(S.avgOut) + ' kcal a day on average; net of it, intake averages ' + fmtK(S.avgNet) + '.' }));
   if (S.weekday && S.weekend) c1.appendChild(el('div', { class: 'note', text: 'Weekdays average ' + fmtK(S.weekday) + ' kcal, weekends ' + fmtK(S.weekend) + '.' }));
   box.appendChild(c1);
-  columnChart(chart1, { items: S.days.map(d => ({ label: xLabel(d.date, range), value: Math.max(0, d.net), over: d.net > S.targets.kcal * 1.1, d })), target: S.targets.kcal, tipText: (it) => AZ.pretty(it.d.date) + ' · ' + fmtK(it.d.net) + ' kcal' + (it.d.out ? ' (' + fmtK(it.d.totals.kcal) + ' in · ~' + fmtK(it.d.out) + ' out)' : '') + ' · P ' + fmtG(it.d.totals.protein) + ' · C ' + fmtG(it.d.totals.carbs) + ' · F ' + fmtG(it.d.totals.fat) });
+  columnChart(chart1, { items: S.days.map(d => ({ label: xLabel(d.date, range), value: d.totals.kcal, over: d.totals.kcal > S.targets.kcal * 1.1, d })), target: S.targets.kcal, tipText: (it) => AZ.pretty(it.d.date) + ' · ' + fmtK(it.d.totals.kcal) + ' kcal' + (it.d.out ? ' · ' + (it.d.mv.estimated ? '~' : '') + fmtK(it.d.out) + ' out · net ' + fmtK(it.d.net) : '') + ' · P ' + fmtG(it.d.totals.protein) + ' · C ' + fmtG(it.d.totals.carbs) + ' · F ' + fmtG(it.d.totals.fat) });
   // Macros
   const c2 = el('section', { class: 'card' }, el('h3', { text: 'Macros' }), el('div', { class: 'sub', text: 'Daily averages against targets' }));
   const macros = el('div', { class: 'macros', style: 'margin-top:12px' });

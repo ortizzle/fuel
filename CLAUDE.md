@@ -107,11 +107,12 @@ letters always sit beside the numbers so identity never depends on colour alone.
   movement is: native records if there are any, else The Howlers' read-only cache — never both, so
   importing Howlers history cannot double-count. Everything that reads the log still filters on
   `type === 'entry'`, so entries and workouts never leak into each other's totals.
-- **Energy out is blue (`--move`), energy in is brass.** The ring is *net* — intake minus burn —
-  when `netting()` is on (default), and intake alone when it is off. Net can go below zero before
-  breakfast; the ring clamps at empty and "left" grows. `computeStats` keeps `totals.kcal` (intake)
-  for context and meal shares and uses `net` for the target checks, the chart and the averages —
-  never mix them up. `workoutKcal()` returns the source's figure when there is one, a MET estimate
+- **Energy out is blue (`--move`), energy in is brass, and nothing nets.** `ringSVG(pct, outPct)`
+  draws two rings on one scale (the calorie target): intake clockwise from the top, burn
+  counter-clockwise from the top, so the gap between the two ends is the deficit. The center and
+  every target check in `computeStats` are intake (`totals.kcal`); `out` and `net` ride along per
+  day for the table and the prompts only. A netted ring with a switch was built and rejected — do
+  not bring it back without asking. `workoutKcal()` returns the source's figure when there is one, a MET estimate
   flagged `estimated` only when a weight is on file, and `null` otherwise; the UI shows minutes
   rather than inventing a number, and a `null` burn nets nothing.
 - **Peloton ids come from the row's timestamp** (`wk_pel_<date>_<hhmm>_<kind>`), so re-importing the
