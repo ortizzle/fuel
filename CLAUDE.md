@@ -115,6 +115,12 @@ letters always sit beside the numbers so identity never depends on colour alone.
   same export adds nothing and a ride the user deleted stays a tombstone. Columns are matched by
   header name, not position. The parser was written against the documented export format; confirm it
   against a real file the first time.
+- **`estimateTargets()` is pure and deterministic** — Mifflin-St Jeor, an activity factor, a deficit,
+  then protein → fat → carbs → fiber in that order, each with a floor or cap. Keep it that way: the
+  sheet shows its reasoning line by line, and a test pins the arithmetic to hand-computed values
+  (220 lb, 5'10", 45, male, sedentary → 2,267 maintenance, 1,767 steady). A target below the floor
+  (1,500 men / 1,200 women) is flagged, never blocked. `profileContext()` folds maintenance and the
+  current target in, so every prompt knows whether the user is cutting and by how much.
 - **The training profile is context, not a plan.** `profileContext()` is injected into every AI
   prompt. The old hardcoded "training for a half marathon" line is gone — do not put personal
   assumptions in prompt text; they belong in Settings where the user can change them.

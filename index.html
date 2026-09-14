@@ -97,6 +97,7 @@
   .workout-strip svg { width: 18px; height: 18px; color: var(--move); flex: none; }
   .workout-strip b { color: var(--move); font-weight: 700; }
   .seg.wide { width: 100%; } .seg.wide button { flex: 1; padding: 0 8px; }
+  .seg.tight button { padding: 0 5px; font-size: 13px; }
   .icon-btn { min-width: 44px; min-height: 44px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; color: var(--ink-mid); }
   .icon-btn:active { background: var(--surface-2); }
   .icon-btn svg { width: 22px; height: 22px; }
@@ -168,6 +169,10 @@
   .checks label.check { display: flex; align-items: center; gap: 9px; min-height: 40px; margin: 0; font-size: 14px; color: var(--ink); font-weight: 500; line-height: 1.25; }
   .checks input[type=checkbox] { width: 20px; height: 20px; min-height: 0; padding: 0; margin: 0; accent-color: var(--accent); flex: none; }
   textarea.plain { width: 100%; min-height: 64px; resize: vertical; }
+  .trow { padding: 9px 0; border-bottom: 1px solid var(--line); }
+  .trow:last-child { border-bottom: 0; }
+  .trow .th { display: flex; justify-content: space-between; gap: 8px; font-weight: 700; font-size: 14px; }
+  .trow .tw { font-size: 12.5px; color: var(--ink-dim); margin-top: 2px; }
   .empty { text-align: center; padding: 36px 12px; color: var(--ink-dim); }
   .empty h3 { font-size: 18px; font-weight: 700; color: var(--ink-mid); margin-bottom: 6px; }
   .empty p { font-size: 14px; max-width: 320px; margin: 0 auto; }
@@ -543,7 +548,7 @@ state.settings.targets = Object.assign({}, DEFAULT_TARGETS, state.settings.targe
 // What the user is working with. It is context for every AI call, not a plan: equipment,
 // what they are open to, what is off the table for now, and an optional weight that exists
 // only so a walk or a set of weights can get a rough calorie figure.
-state.settings.profile = Object.assign({ equipment: [], open: '', avoid: '', goal: '', weightLb: null }, state.settings.profile || {});
+state.settings.profile = Object.assign({ equipment: [], open: '', avoid: '', goal: '', weightLb: null, heightIn: null, age: null, sex: 'm', activity: 'sedentary', goalLb: null, goalMode: 'steady', kcalCustom: null }, state.settings.profile || {});
 
 function saveData() { if (!Store.set('data', state.data)) toast('Storage is full — could not save'); }
 function saveSettings() { Store.set('settings', state.settings); }
@@ -775,6 +780,8 @@ function profileContext() {
   if (p.avoid) bits.push('not right now: ' + p.avoid);
   if (p.goal) bits.push('goal: ' + p.goal);
   if (Number(p.weightLb) > 0) bits.push('weight about ' + Math.round(p.weightLb) + ' lb');
+  const est = estimateTargets(p), tk = Number(state.settings.targets.kcal) || 0;
+  if (est.maintenance) bits.push('estimated maintenance about ' + est.maintenance + ' kcal/day; daily calorie target ' + tk + (tk && tk < est.maintenance ? ' (about ' + (est.maintenance - tk) + ' below maintenance, aiming to lose weight)' : ''));
   return bits.length ? "About the user's training — " + bits.join('; ') + '. Anything you suggest that involves exercise must fit this.' : '';
 }
 
@@ -1565,6 +1572,132 @@ function importFromHowlers() {
   const list = [];
   for (const [date, ws] of Object.entries(c.byDate)) ws.forEach((h, i) => { if (h.minutes > 0 || h.miles > 0) list.push({ id: 'wk_howl_' + date + '_' + h.type + '_' + i, date, time: '07:00', kind: howlerKind(h.type), title: h.label, minutes: h.minutes || 0, miles: h.miles || null, source: 'howlers' }); });
   return importWorkouts(list);
+}
+
+/* =====================================================================
+   7c. Targets from a goal — maintenance from Mifflin-St Jeor, a deficit, and a macro split
+       that keeps protein high while cutting. Deterministic and shown with its reasoning:
+       an estimate to adjust, not a prescription.
+   ===================================================================== */
+const ACTIVITY = [['sedentary', 'Sedentary', 1.2, 'Desk days, little planned exercise beyond what is logged'], ['light', 'Light', 1.375, 'On your feet a fair amount, or a few short sessions a week'], ['moderate', 'Moderate', 1.55, 'Moving most days, 30–60 min'], ['active', 'Active', 1.725, 'Hard training most days']];
+const GOAL_MODES = [['steady', 'Steady loss', -500], ['faster', 'Faster loss', -750], ['maintain', 'Maintain', 0], ['custom', 'Custom', null]];
+function estimateTargets(p) {
+  p = p || {};
+  const w = Number(p.weightLb) || 0, h = Number(p.heightIn) || 0, a = Number(p.age) || 0;
+  const act = ACTIVITY.find(x => x[0] === p.activity) || ACTIVITY[0];
+  const mode = GOAL_MODES.find(g => g[0] === p.goalMode) || GOAL_MODES[0];
+  const bmr = (w > 0 && h > 0 && a > 0) ? 10 * (w * 0.4536) + 6.25 * (h * 2.54) - 5 * a + (p.sex === 'f' ? -161 : 5) : null;
+  const maintenance = bmr ? Math.round(bmr * act[2]) : null;
+  let target = (mode[0] === 'custom' || !maintenance) ? Math.round(Number(p.kcalCustom) || 0) : maintenance + mode[2];
+  if (!(target > 0)) target = maintenance || 0;
+  const floor = p.sex === 'f' ? 1200 : 1500;
+  // Protein first: 0.8 g per lb of goal weight when there is one, else 0.7 g per lb — high
+  // enough to hold muscle on a cut — kept between 100 g and 40% of calories. Fat takes a
+  // quarter of calories with a 40 g floor; carbs are what is left; fiber scales with calories.
+  const base = Number(p.goalLb) > 0 ? 0.8 * Number(p.goalLb) : 0.7 * w;
+  const cap = Math.min(220, 0.40 * target / 4);
+  const protein = target ? Math.round(Math.max(Math.min(base, cap), Math.min(100, cap))) : 0;
+  const fat = target ? Math.round(Math.max(0.25 * target / 9, 40)) : 0;
+  const carbs = target ? Math.max(50, Math.round((target - protein * 4 - fat * 9) / 4)) : 0;
+  const fiber = target ? Math.max(25, Math.round(14 * target / 1000)) : 0;
+  const pct = target ? { protein: protein * 4 / target, carbs: carbs * 4 / target, fat: fat * 9 / target } : { protein: 0, carbs: 0, fat: 0 };
+  return { bmr: bmr ? Math.round(bmr) : null, maintenance, target, floor, belowFloor: target > 0 && target < floor,
+    deficit: maintenance ? maintenance - target : null, weeklyLb: maintenance ? (maintenance - target) * 7 / 3500 : null,
+    targets: { kcal: target, protein, carbs, fat, fiber }, pct, activity: act, mode };
+}
+function movementAverage(days) {
+  const today = AZ.today(); let total = 0;
+  for (let i = 0; i < days; i++) total += dayMovement(AZ.addDays(today, -i)).minutes;
+  return Math.round(total / days);
+}
+function targetsPrompt(est, avgMin) {
+  const T = est.targets, r = (x) => Math.round(x * 100);
+  return 'The user is setting daily nutrition targets in a personal food and movement log. ' + (profileContext() ? profileContext() + ' ' : '') +
+    'Estimated maintenance ' + est.maintenance + ' kcal/day (Mifflin-St Jeor × ' + est.activity[2] + ', ' + est.activity[1].toLowerCase() + '). Proposed daily targets: ' + T.kcal + ' kcal (' + (est.deficit > 0 ? est.deficit + ' below maintenance' : 'at maintenance') + '), protein ' + T.protein + ' g (' + r(est.pct.protein) + '%), carbs ' + T.carbs + ' g (' + r(est.pct.carbs) + '%), fat ' + T.fat + ' g (' + r(est.pct.fat) + '%), fiber ' + T.fiber + ' g. Logged movement over the last 14 days averages ' + avgMin + ' min a day.\n\n' +
+    'In second person, give 2 to 4 short, specific notes on whether this mix fits their situation and what they might adjust — practical, food-level, no generic advice, no medical claims. Respond with ONLY valid JSON, no markdown fences: {"headline":"max 10 words","notes":["..."]}';
+}
+function openTargetsSheet() {
+  const P = state.settings.profile;
+  const s = openSheet({ title: 'Targets from your goal', sub: 'An estimate to adjust, not a prescription' });
+  const num = (key, attrs) => { const i = numInput(Object.assign({ value: P[key] ? String(P[key]) : '' }, attrs)); i.addEventListener('change', () => { const v = numVal(i, 0); P[key] = v > 0 ? v : null; saveSettings(); refresh(); }); return i; };
+  const wtIn = num('weightLb', { 'aria-label': 'Weight in pounds', placeholder: 'lb' });
+  const ftIn = numInput({ value: P.heightIn ? String(Math.floor(P.heightIn / 12)) : '', 'aria-label': 'Height feet', inputmode: 'numeric', placeholder: 'ft' });
+  const inIn = numInput({ value: P.heightIn ? String(Math.round(P.heightIn % 12)) : '', 'aria-label': 'Height inches', inputmode: 'numeric', placeholder: 'in' });
+  const setHeight = () => { const h = numVal(ftIn, 0) * 12 + numVal(inIn, 0); P.heightIn = h > 0 ? h : null; saveSettings(); refresh(); };
+  ftIn.addEventListener('change', setHeight); inIn.addEventListener('change', setHeight);
+  const ageIn = num('age', { 'aria-label': 'Age', inputmode: 'numeric', placeholder: 'years' });
+  const goalIn = num('goalLb', { 'aria-label': 'Goal weight in pounds', placeholder: 'optional' });
+  const kcalIn = numInput({ value: '', 'aria-label': 'Calorie target', inputmode: 'numeric' });
+  kcalIn.addEventListener('change', () => { const v = numVal(kcalIn, 0); if (v > 0) { P.goalMode = 'custom'; P.kcalCustom = Math.round(v); saveSettings(); refresh(); } });
+  const sexSeg = segControl([['m', 'Male'], ['f', 'Female']], P.sex === 'f' ? 'f' : 'm', (v) => { P.sex = v; saveSettings(); refresh(); });
+  const actSeg = segControl(ACTIVITY.map(a => [a[0], a[1]]), ACTIVITY.some(a => a[0] === P.activity) ? P.activity : 'sedentary', (v) => { P.activity = v; saveSettings(); refresh(); });
+  const goalWrap = el('div'), actHint = el('div', { class: 'note' }), maint = el('div', { class: 'stat', style: 'margin-top:4px' }), goalLine = el('div', { class: 'note' }), rows = el('div'), aiOut = el('div');
+  const applyBtn = el('button', { class: 'btn primary', type: 'button', text: 'Apply to my targets' });
+  const askBtn = el('button', { class: 'btn ghost', type: 'button' }, svgIcon(ICON.spark, 18), 'Ask Claude about this mix');
+  let est = null, segMode = null;
+  const row = (key, label, grams, pctv, why) => el('div', { class: 'trow' },
+    el('div', { class: 'th' }, el('span', { style: 'color:var(--' + key + ')', text: label }), el('span', { class: 'num', text: grams + ' g' + (pctv ? ' · ' + Math.round(pctv * 100) + '%' : '') })),
+    el('div', { class: 'tw', text: why }));
+  const refresh = () => {
+    est = estimateTargets(P);
+    actHint.textContent = est.activity[3] + '. Logged movement counts separately: about ' + movementAverage(14) + ' min a day over the last 14 days.';
+    clear(maint);
+    if (est.maintenance) maint.append(el('div', { class: 'v', text: '≈ ' + fmtK(est.maintenance) + ' kcal a day' }), el('div', { class: 'l', text: 'to stay where you are · Mifflin-St Jeor × ' + est.activity[2] }));
+    else maint.append(el('div', { class: 'v', text: '—' }), el('div', { class: 'l', text: 'Enter weight, height and age to estimate maintenance' }));
+    // Rebuilt only when the active mode changes (a typed number flips it to Custom). Blurring
+    // the calorie box comes first: leaving a field you typed in fires a native change, and that
+    // must land before the chosen mode is written, not after it — or the tap undoes itself.
+    if (segMode !== est.mode[0]) {
+      segMode = est.mode[0];
+      clear(goalWrap);
+      goalWrap.appendChild(segControl(GOAL_MODES.map(g => [g[0], g[1]]), est.mode[0], (v) => { kcalIn.blur(); P.goalMode = v; if (v !== 'custom') P.kcalCustom = null; saveSettings(); refresh(); }, 'tight'));
+    }
+    setNum(kcalIn, est.target ? String(est.target) : '');
+    goalLine.style.cssText = '';
+    if (!est.target) goalLine.textContent = '';
+    else if (est.belowFloor) { goalLine.textContent = 'Below ' + fmtK(est.floor) + ' kcal, which is the floor most guidance uses without a doctor involved. It can work, but it is a lot to hold to day after day.'; goalLine.style.cssText = 'color:var(--warn);font-weight:600'; }
+    else if (est.deficit === null) goalLine.textContent = 'Typed target. Enter weight, height and age above to see how it compares with maintenance.';
+    else goalLine.textContent = est.deficit > 0 ? fmtK(est.deficit) + ' kcal a day below maintenance ≈ ' + (Math.round(est.weeklyLb * 10) / 10) + ' lb a week, by the usual rule of thumb.' : est.deficit < 0 ? fmtK(-est.deficit) + ' kcal a day above maintenance.' : 'At maintenance — holding steady.';
+    clear(rows);
+    if (est.target) {
+      const T = est.targets;
+      rows.append(
+        row('protein', 'Protein', T.protein, est.pct.protein, (Number(P.goalLb) > 0 ? '0.8 g per lb of goal weight' : '0.7 g per lb') + ' — the lever that holds on to muscle while you cut, and the most filling macro.'),
+        row('fat', 'Fat', T.fat, est.pct.fat, 'A quarter of calories, never under 40 g — the floor for hormones and for meals that actually satisfy.'),
+        row('carbs', 'Carbs', T.carbs, est.pct.carbs, 'What is left after protein and fat. Fuel for the rides, and the first place to trim when a day runs over.'),
+        row('fiber', 'Fiber', T.fiber, 0, '14 g per 1,000 kcal, at least 25 — fullness on fewer calories.'));
+    }
+    applyBtn.disabled = !est.target;
+    askBtn.classList.toggle('hidden', !est.target || !AI.mode());
+  };
+  applyBtn.addEventListener('click', () => {
+    if (!est || !est.target) return;
+    Object.assign(state.settings.targets, est.targets);
+    saveSettings(); render(); closeSheet();
+    toast('Targets set: ' + fmtK(est.target) + ' kcal · P ' + est.targets.protein + ' · C ' + est.targets.carbs + ' · F ' + est.targets.fat);
+  });
+  askBtn.addEventListener('click', async () => {
+    clear(aiOut); const st = el('div'); aiOut.appendChild(st); statusLine(st, 'Asking Claude…', 'busy'); askBtn.disabled = true;
+    try {
+      const r = await AI.json(targetsPrompt(est, movementAverage(14)), { tier: 'quick' });
+      clear(aiOut); aiOut.appendChild(renderAIBox({ headline: r.headline, lists: [['Notes', r.notes]] }));
+    } catch (e) { statusLine(st, aiErrorMessage(e), 'err'); }
+    finally { askBtn.disabled = false; }
+  });
+  addKids(s.body,
+    el('div', { class: 'field' }, el('label', { text: 'About you' }),
+      el('div', { class: 'grid-3' }, el('div', { class: 'field' }, el('label', { text: 'Weight (lb)' }), wtIn), el('div', { class: 'field' }, el('label', { text: 'Height ft' }), ftIn), el('div', { class: 'field' }, el('label', { text: 'in' }), inIn)),
+      el('div', { class: 'grid-2', style: 'align-items:end' }, el('div', { class: 'field' }, el('label', { text: 'Age' }), ageIn), el('div', { class: 'field' }, el('label', { text: 'Equation basis' }), sexSeg)),
+      el('div', { class: 'field' }, el('label', { text: 'Day-to-day activity' }), actSeg, actHint)),
+    el('div', { class: 'field' }, el('label', { text: 'Maintenance' }), maint),
+    el('div', { class: 'field', style: 'margin-top:14px' }, el('label', { text: 'Goal' }), goalWrap,
+      el('div', { class: 'grid-2', style: 'margin-top:10px' }, el('div', { class: 'field' }, el('label', { text: 'Calories a day' }), kcalIn), el('div', { class: 'field' }, el('label', { text: 'Goal weight (lb)' }), goalIn)),
+      goalLine),
+    el('div', { class: 'field' }, el('label', { text: 'Macros' }), rows),
+    el('div', { class: 'note' }, 'Once calories and protein are set, no split is provably better than another; this is the well-supported shape. Any number can be changed in Settings afterwards.'),
+    el('div', { class: 'btn-row' }, askBtn, applyBtn),
+    aiOut);
+  refresh();
 }
 
 /* =====================================================================
@@ -2359,7 +2492,9 @@ function openSettings() {
   s.body.append(
     el('div', { class: 'field' }, el('label', { text: 'Daily targets' }),
       el('div', { class: 'grid-3' }, el('div', { class: 'field' }, el('label', { text: 'Calories' }), tIn.kcal), el('div', { class: 'field' }, el('label', { text: 'Fiber g' }), tIn.fiber), el('div', { class: 'field' }, el('label', { text: 'Move min' }), tIn.move)),
-      el('div', { class: 'grid-3' }, el('div', { class: 'field' }, el('label', { text: 'Protein g' }), tIn.protein), el('div', { class: 'field' }, el('label', { text: 'Carbs g' }), tIn.carbs), el('div', { class: 'field' }, el('label', { text: 'Fat g' }), tIn.fat))),
+      el('div', { class: 'grid-3' }, el('div', { class: 'field' }, el('label', { text: 'Protein g' }), tIn.protein), el('div', { class: 'field' }, el('label', { text: 'Carbs g' }), tIn.carbs), el('div', { class: 'field' }, el('label', { text: 'Fat g' }), tIn.fat)),
+      el('button', { class: 'btn', type: 'button', text: 'Set targets from a goal', style: 'margin-top:4px', onclick: () => openTargetsSheet() }),
+      el('div', { class: 'note' }, 'Weight, height and age give an estimate of what you burn in a day; pick a deficit and the macros follow, with the reasoning shown.')),
     el('div', { class: 'field' }, el('label', { text: 'Appearance' }), scheme),
     el('div', { class: 'field', style: 'margin-top:16px' }, el('label', { text: 'Claude API key (photos, descriptions, summaries)' }), keyRow,
       el('div', { class: 'note', text: AI.mode() === 'preview' ? 'This preview supplies AI itself; a key is only needed in the deployed app.' : 'Stored only in this browser. Calls go straight from your phone to Anthropic — nothing passes through a server.' })),
@@ -2690,7 +2825,7 @@ function init() {
     if (!Store.get('seeded_v2') && Object.values(state.data.records).filter(r => r.type === 'entry' && !r.deleted).length === 0) { seedSampleDays(14); Store.set('seeded_v2', true); }
     // Sample profile so the preview shows what an informed Claude looks like. Real installs start blank.
     const pf = state.settings.profile;
-    if (!pf.open && !pf.avoid && !(pf.equipment || []).length) { Object.assign(pf, { equipment: ['peloton', 'weights', 'outdoors'], open: 'walking, and rides on the bike', avoid: 'running for now — carrying extra weight, keeping the joints happy', goal: 'move most days, lose weight steadily', weightLb: 220 }); saveSettings(); }
+    if (!pf.open && !pf.avoid && !(pf.equipment || []).length) { Object.assign(pf, { equipment: ['peloton', 'weights', 'outdoors'], open: 'walking, and rides on the bike', avoid: 'running for now — carrying extra weight, keeping the joints happy', goal: 'move most days, lose weight steadily', weightLb: 220, heightIn: 70, age: 45, sex: 'm', activity: 'sedentary', goalMode: 'steady' }); saveSettings(); }
   }
   $('date-prev').addEventListener('click', () => { state.date = AZ.addDays(state.date, -1); render(); });
   $('date-next').addEventListener('click', () => { state.date = AZ.addDays(state.date, 1); render(); });
@@ -2711,7 +2846,7 @@ function init() {
   AI.init();
   if (Howlers.connected()) Howlers.refresh(false).then(() => { renderWorkoutStrip(); if (state.view === 'insights') renderInsights(); }).catch(() => {});
 }
-window.Fuel = { state, AZ, Store, Howlers, addWorkout, updateWorkout, deleteWorkout, workoutsFor, dayMovement, workoutKcal, parseCSV, parsePelotonCSV, importWorkouts, importFromHowlers, openMoveSheet, profileContext, KINDS, getSummary, saveSummary, dropSummary, daySummaryId, rangeSummaryId, dayFingerprint, rangeFingerprint, summarizeDay, recentFoods, savedMeals, saveMealFrom, deleteSavedMeal, logSavedMeal, photoTimestamp, parseExifDate, guessMeal, defaultContext, addEntry, updateEntry, deleteEntry, entriesFor, dayTotals, computeStats, render, renderInsights, showView, Scanner, FoodDB, AI, parseEstimate, parseJSONLoose, normalizeOFF, normalizeUSDA, normalizeBarcode, upcEToA, codeVariants, openScanSheet, openPhotoSheet, openAddSheet, openEditSheet, openSettings, seedSampleDays, applyScheme, closeSheet, MEALS, CONTEXTS };
+window.Fuel = { state, AZ, Store, Howlers, estimateTargets, openTargetsSheet, movementAverage, ACTIVITY, GOAL_MODES, addWorkout, updateWorkout, deleteWorkout, workoutsFor, dayMovement, workoutKcal, parseCSV, parsePelotonCSV, importWorkouts, importFromHowlers, openMoveSheet, profileContext, KINDS, getSummary, saveSummary, dropSummary, daySummaryId, rangeSummaryId, dayFingerprint, rangeFingerprint, summarizeDay, recentFoods, savedMeals, saveMealFrom, deleteSavedMeal, logSavedMeal, photoTimestamp, parseExifDate, guessMeal, defaultContext, addEntry, updateEntry, deleteEntry, entriesFor, dayTotals, computeStats, render, renderInsights, showView, Scanner, FoodDB, AI, parseEstimate, parseJSONLoose, normalizeOFF, normalizeUSDA, normalizeBarcode, upcEToA, codeVariants, openScanSheet, openPhotoSheet, openAddSheet, openEditSheet, openSettings, seedSampleDays, applyScheme, closeSheet, MEALS, CONTEXTS };
 init();
 })();
 </script>
