@@ -112,7 +112,17 @@ letters always sit beside the numbers so identity never depends on colour alone.
   counter-clockwise from the top, so the gap between the two ends is the deficit. The center and
   every target check in `computeStats` are intake (`totals.kcal`); `out` and `net` ride along per
   day for the table and the prompts only. A netted ring with a switch was built and rejected — do
-  not bring it back without asking. `workoutKcal()` returns the source's figure when there is one, a MET estimate
+  not bring it back without asking.
+- **Over target is a proportional red overlay, never a full color flip.** The ring's `.in` circle
+  is always `var(--accent)`; when `pct > 1`, a second arc (`arcFromTop`, clockwise from the top)
+  paints red over the overage's own share of the circle — 25% over covers a quarter of the ring —
+  capped at a full circle past double the target. `macroRow` mirrors this with a second `.over` div
+  absolutely positioned over the base fill, sized to `(p - 1) * 100%` from the left. Neither ever
+  recolors the base fill or clamps the center number; a whole-ring or whole-bar color swap at some
+  threshold was tried first and replaced because it can't show *how much* over, only *that*.
+  Protein's theme color (`--protein`) sits close to `--danger` in both palettes, so its overlay
+  reads faint against its own fill — known, not a bug; ask before changing the macro palette to fix it.
+  `workoutKcal()` returns the source's figure when there is one, a MET estimate
   flagged `estimated` only when a weight is on file, and `null` otherwise; the UI shows minutes
   rather than inventing a number, and a `null` burn nets nothing.
 - **Peloton ids come from the row's timestamp** (`wk_pel_<date>_<hhmm>_<kind>`), so re-importing the

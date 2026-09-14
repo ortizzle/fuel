@@ -126,9 +126,9 @@
   .macro .lbl i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; background: var(--mc); }
   .macro .val { grid-column: 2; grid-row: 1; font-variant-numeric: tabular-nums; white-space: nowrap; font-weight: 600; }
   .macro .val small { color: var(--ink-dim); font-weight: 500; font-size: 11px; }
-  .macro .bar { grid-column: 1 / 3; grid-row: 2; height: 6px; border-radius: 4px; background: var(--track); overflow: hidden; }
+  .macro .bar { position: relative; grid-column: 1 / 3; grid-row: 2; height: 6px; border-radius: 4px; background: var(--track); overflow: hidden; }
   .macro .bar > div { height: 100%; border-radius: 4px; background: var(--mc); width: 0; transition: width .4s ease; }
-  .macro .bar > div.over { background: var(--danger); }
+  .macro .bar > div.over { position: absolute; inset: 0 auto 0 0; background: var(--danger); }
   .macro.protein { --mc: var(--protein); } .macro.carbs { --mc: var(--carbs); } .macro.fat { --mc: var(--fat); } .macro.fiber { --mc: var(--fiber); }
   .link-btn { min-height: 44px; display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-size: 14px; color: var(--accent); padding: 0 4px; }
   .link-btn svg { width: 18px; height: 18px; }
@@ -806,7 +806,16 @@ function ringSVG(pct, outPct) {
   const r = (size - stroke) / 2, c = 2 * Math.PI * r, cx = size / 2;
   svg.appendChild(svgEl('circle', { cx, cy: cx, r, fill: 'none', stroke: 'var(--track)', 'stroke-width': stroke }));
   const fill = Math.min(1, Math.max(0, pct));
-  if (fill > 0) svg.appendChild(svgEl('circle', { class: 'in', cx, cy: cx, r, fill: 'none', stroke: pct > 1.05 ? 'var(--danger)' : 'var(--accent)', 'stroke-width': stroke, 'stroke-dasharray': (fill * c) + ' ' + c, 'stroke-linecap': 'round', transform: 'rotate(-90 ' + cx + ' ' + cx + ')' }));
+  if (fill > 0) svg.appendChild(svgEl('circle', { class: 'in', cx, cy: cx, r, fill: 'none', stroke: 'var(--accent)', 'stroke-width': stroke, 'stroke-dasharray': (fill * c) + ' ' + c, 'stroke-linecap': 'round', transform: 'rotate(-90 ' + cx + ' ' + cx + ')' }));
+  // Over target: a red arc overlays the ring from the top, clockwise, sized to the overage itself
+  // — 25% over paints red across a quarter of the ring — so how far over reads straight off the
+  // dial instead of the whole ring flipping color at a fixed line.
+  const over = Math.max(0, pct - 1);
+  if (over > 0) {
+    const of = Math.min(1, over);
+    if (of >= 1) svg.appendChild(svgEl('circle', { class: 'over', cx, cy: cx, r, fill: 'none', stroke: 'var(--danger)', 'stroke-width': stroke }));
+    else svg.appendChild(svgEl('path', { class: 'over', d: arcFromTop(cx, cx, r, of, false), fill: 'none', stroke: 'var(--danger)', 'stroke-width': stroke, 'stroke-linecap': 'round' }));
+  }
   // Energy out rides inside energy in, on the same scale (the calorie target) but run the other
   // way round the dial: intake climbs clockwise from the top, burn falls away counter-clockwise,
   // so the gap between the two ends is the day's deficit. The center stays intake; nothing nets.
@@ -825,11 +834,20 @@ function arcFromTop(cx, cy, r, frac, ccw) {
 }
 function macroRow(key, label, val, target) {
   const p = target > 0 ? val / target : 0;
-  const fillEl = el('div', { class: p > 1.05 ? 'over' : '' });
+  const fillEl = el('div', {});
   fillEl.style.width = Math.min(100, p * 100).toFixed(1) + '%';
+  const bar = el('div', { class: 'bar' }, fillEl);
+  // Over target: a red overlay from the left, sized to the overage itself, same language as the
+  // ring — a bar 25% over target shows red across a quarter of its own width.
+  const over = Math.max(0, p - 1);
+  if (over > 0) {
+    const overEl = el('div', { class: 'over' });
+    overEl.style.width = Math.min(100, over * 100).toFixed(1) + '%';
+    bar.appendChild(overEl);
+  }
   return el('div', { class: 'macro ' + key },
     el('span', { class: 'lbl' }, el('i'), label),
-    el('div', { class: 'bar' }, fillEl),
+    bar,
     el('span', { class: 'val' }, fmtG(val), el('small', { text: ' / ' + fmtG(target) + ' g' })));
 }
 function renderSummary() {
