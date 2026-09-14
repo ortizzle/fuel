@@ -1,5 +1,19 @@
 # Fuel — working notes
 
+## Before you edit
+
+This app is worked on from two places: the local clone in `~/Downloads/projects/fuel`, and
+Claude Code cloud sessions, which clone fresh and push straight to GitHub. Whichever copy is
+in front of you may not be the newest.
+
+Run `git fetch origin && git status -sb` before changing any file, and say plainly where
+things stand — behind, ahead, or carrying uncommitted work. If the clone is behind, pull
+first rather than after. A merge git resolves cleanly can still be wrong: git only stops on
+changes that *overlap*, so two sessions editing the same function from different sides merge
+quietly into something broken.
+
+## What this is
+
 Single-file PWA. `index.html` holds all CSS and JS. No build step, no framework.
 Follows the ortizzle family-app standards: createElement only, never `innerHTML` with
 data, no `alert`/`confirm`/`prompt`, 44px tap targets, Arizona dates.
