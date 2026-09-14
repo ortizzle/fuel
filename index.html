@@ -26,7 +26,7 @@
     --line: rgba(23,42,69,.10); --line-strong: rgba(23,42,69,.22);
     --btn-bg: #172a45; --btn-ink: #fffcf7;
     --accent: #8a5a2b; --accent-ink: #fffcf7;
-    --track: #e9e2d4; --grid: #e6dfd1; --axis: #cdc4b3; --bar: #5d6f91;
+    --track: #e9e2d4; --grid: #e6dfd1; --axis: #cdc4b3; --bar: #5d6f91; --move: #5d6f91;
     --protein: #b8302f; --carbs: #a37a00; --fat: #4257d9; --fiber: #2f8a4e;
     --danger: #c0392b; --ok: #2e8b57; --warn: #b7791f;
     --shadow: 0 1px 2px rgba(23,42,69,.05), 0 6px 20px rgba(23,42,69,.06);
@@ -41,7 +41,7 @@
       --line: rgba(241,233,220,.10); --line-strong: rgba(241,233,220,.22);
       --btn-bg: #d2a06f; --btn-ink: #1c1208;
       --accent: #d2a06f; --accent-ink: #1c1208;
-      --track: #263450; --grid: #24324c; --axis: #37476a; --bar: #8fa3c7;
+      --track: #263450; --grid: #24324c; --axis: #37476a; --bar: #8fa3c7; --move: #8fa3c7;
       --protein: #d9455e; --carbs: #bd8b1f; --fat: #7488ff; --fiber: #3aae6c;
       --danger: #ff6b5f; --ok: #4cc98a; --warn: #f0b73a;
       --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px rgba(0,0,0,.35);
@@ -54,7 +54,7 @@
     --line: rgba(241,233,220,.10); --line-strong: rgba(241,233,220,.22);
     --btn-bg: #d2a06f; --btn-ink: #1c1208;
     --accent: #d2a06f; --accent-ink: #1c1208;
-    --track: #263450; --grid: #24324c; --axis: #37476a; --bar: #8fa3c7;
+    --track: #263450; --grid: #24324c; --axis: #37476a; --bar: #8fa3c7; --move: #8fa3c7;
     --protein: #d9455e; --carbs: #bd8b1f; --fat: #7488ff; --fiber: #3aae6c;
     --danger: #ff6b5f; --ok: #4cc98a; --warn: #f0b73a;
     --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px rgba(0,0,0,.35);
@@ -66,7 +66,7 @@
     --line: rgba(23,42,69,.10); --line-strong: rgba(23,42,69,.22);
     --btn-bg: #172a45; --btn-ink: #fffcf7;
     --accent: #8a5a2b; --accent-ink: #fffcf7;
-    --track: #e9e2d4; --grid: #e6dfd1; --axis: #cdc4b3; --bar: #5d6f91;
+    --track: #e9e2d4; --grid: #e6dfd1; --axis: #cdc4b3; --bar: #5d6f91; --move: #5d6f91;
     --protein: #b8302f; --carbs: #a37a00; --fat: #4257d9; --fiber: #2f8a4e;
     --danger: #c0392b; --ok: #2e8b57; --warn: #b7791f;
     --shadow: 0 1px 2px rgba(23,42,69,.05), 0 6px 20px rgba(23,42,69,.06);
@@ -91,9 +91,11 @@
   .seg { display: inline-flex; background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; padding: 3px; gap: 2px; }
   .seg button { min-height: 44px; padding: 0 14px; border-radius: 999px; font-weight: 600; font-size: 14px; color: var(--ink-mid); white-space: nowrap; }
   .seg button.active { background: var(--btn-bg); color: var(--btn-ink); }
-  .workout-strip { display: flex; align-items: center; gap: 8px; margin: 10px 4px 0; font-size: 13px; color: var(--ink-mid); }
-  .workout-strip svg { width: 18px; height: 18px; color: var(--accent); flex: none; }
-  .workout-strip b { color: var(--accent); font-weight: 700; }
+  .workout-strip { display: flex; align-items: flex-start; gap: 8px; margin: 10px 4px 0; font-size: 13px; line-height: 1.4; color: var(--ink-mid); }
+  .workout-strip > span { min-width: 0; }
+  .workout-strip b { white-space: nowrap; }
+  .workout-strip svg { width: 18px; height: 18px; color: var(--move); flex: none; }
+  .workout-strip b { color: var(--move); font-weight: 700; }
   .seg.wide { width: 100%; } .seg.wide button { flex: 1; padding: 0 8px; }
   .icon-btn { min-width: 44px; min-height: 44px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; color: var(--ink-mid); }
   .icon-btn:active { background: var(--surface-2); }
@@ -147,14 +149,33 @@
   .mac .p { color: var(--protein); } .mac .c { color: var(--carbs); } .mac .f { color: var(--fat); } .mac .fb { color: var(--fiber); }
   .mac .sep { color: var(--line-strong); font-weight: 400; }
   .mac b { font-weight: 800; }
+  /* Energy out: a workout card sits in the day's timeline beside the meals, blue where food is brass. */
+  .wk { width: 100%; text-align: left; display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; min-height: 60px; padding: 10px 12px 10px 10px; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--move); margin: 16px 0 6px; }
+  .wk:active { background: var(--surface-2); }
+  .wk .ico { width: 36px; height: 36px; border-radius: 10px; background: var(--surface-2); display: flex; align-items: center; justify-content: center; color: var(--move); flex: none; }
+  .wk .ico svg { width: 20px; height: 20px; }
+  .wk > div:nth-child(2) { min-width: 0; }
+  .wk .name { font-weight: 600; font-size: 15px; line-height: 1.25; }
+  .wk .meta { font-size: 12.5px; color: var(--ink-dim); margin-top: 3px; }
+  .wk .meta span { white-space: nowrap; }
+  .wk .out { font-weight: 700; font-size: 17px; text-align: right; color: var(--move); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .wk .outl { font-size: 11px; color: var(--ink-dim); text-align: right; margin-top: 2px; white-space: nowrap; }
+  .kind-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .kind-btn { min-height: 56px; border-radius: var(--radius); border: 1px solid var(--line-strong); background: var(--surface); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-size: 12.5px; font-weight: 600; color: var(--ink-mid); }
+  .kind-btn svg { width: 20px; height: 20px; }
+  .kind-btn.active { background: var(--btn-bg); color: var(--btn-ink); border-color: transparent; }
+  .checks { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 10px; }
+  .checks label.check { display: flex; align-items: center; gap: 9px; min-height: 40px; margin: 0; font-size: 14px; color: var(--ink); font-weight: 500; line-height: 1.25; }
+  .checks input[type=checkbox] { width: 20px; height: 20px; min-height: 0; padding: 0; margin: 0; accent-color: var(--accent); flex: none; }
+  textarea.plain { width: 100%; min-height: 64px; resize: vertical; }
   .empty { text-align: center; padding: 36px 12px; color: var(--ink-dim); }
   .empty h3 { font-size: 18px; font-weight: 700; color: var(--ink-mid); margin-bottom: 6px; }
   .empty p { font-size: 14px; max-width: 320px; margin: 0 auto; }
 
   /* ---------- Capture bar ---------- */
   .capture-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); background: var(--bg); border-top: 1px solid var(--line); }
-  .capture-inner { max-width: 560px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
-  .cap-btn { min-height: 58px; border-radius: 14px; border: 1px solid var(--line-strong); background: var(--surface); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-weight: 600; font-size: 13px; }
+  .capture-inner { max-width: 560px; margin: 0 auto; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .cap-btn { min-height: 58px; border-radius: 14px; border: 1px solid var(--line-strong); background: var(--surface); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-weight: 600; font-size: 12.5px; }
   .cap-btn svg { width: 22px; height: 22px; }
   .cap-btn:active { transform: translateY(1px); }
   .cap-btn.primary { background: var(--btn-bg); color: var(--btn-ink); border-color: transparent; }
@@ -309,6 +330,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
       <span>Add</span>
     </button>
+    <button class="cap-btn" id="cap-move" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17a3 3 0 1 0 6 0a3 3 0 1 0-6 0M14 17a3 3 0 1 0 6 0a3 3 0 1 0-6 0M7 17l3.5-8h4L17 17M10.5 9L9 13.5h7.5M13 6h2.5"/></svg>
+      <span>Move</span>
+    </button>
   </div>
 </nav>
 <div class="toast" id="toast" role="status"></div>
@@ -434,7 +459,12 @@ function svgIcon(d, size) {
   s.appendChild(svgEl('path', { d }));
   return s;
 }
-const ICON = { run: 'M22 12h-4l-3 9L9 3l-3 9H2', close: 'M6 6l12 12M18 6L6 18', spark: 'M12 3l1.9 5.6L19.5 10.5l-5.6 1.9L12 18l-1.9-5.6L4.5 10.5l5.6-1.9z', plate: 'M3 12a9 9 0 1 0 18 0a9 9 0 1 0-18 0M8 12a4 4 0 1 0 8 0a4 4 0 1 0-8 0' };
+const ICON = { run: 'M22 12h-4l-3 9L9 3l-3 9H2', close: 'M6 6l12 12M18 6L6 18', spark: 'M12 3l1.9 5.6L19.5 10.5l-5.6 1.9L12 18l-1.9-5.6L4.5 10.5l5.6-1.9z', plate: 'M3 12a9 9 0 1 0 18 0a9 9 0 1 0-18 0M8 12a4 4 0 1 0 8 0a4 4 0 1 0-8 0',
+  bike: 'M4 17a3 3 0 1 0 6 0a3 3 0 1 0-6 0M14 17a3 3 0 1 0 6 0a3 3 0 1 0-6 0M7 17l3.5-8h4L17 17M10.5 9L9 13.5h7.5M13 6h2.5',
+  walk: 'M12 4.5a1.5 1.5 0 1 0 3 0a1.5 1.5 0 1 0-3 0M13.5 7.5L12 13l-3 7M12 13l4 3v5M13 8l-3.5 2.5-1 3.5M13.5 8.5l2.5 2.5h2.5',
+  dumbbell: 'M3 10v4M6 8v8M18 8v8M21 10v4M6 12h12',
+  stretch: 'M3 12c2.5-5 5-5 7.5 0s5 5 7.5 0',
+  upload: 'M12 16V4M6 10l6-6 6 6M4 20h16' };
 function fmtK(n) { return Math.round(Number(n) || 0).toLocaleString('en-US'); }
 function fmtG(n) { const r = Math.round((Number(n) || 0) * 10) / 10; return Number.isInteger(r) ? String(r) : r.toFixed(1); }
 function fmtServ(n) { return String(Math.round(n * 100) / 100); }
@@ -485,11 +515,19 @@ function segControl(options, value, onChange, extraClass) {
 /* =====================================================================
    3. State & data model (records with id/updatedAt/tombstones — Gist-sync ready)
    ===================================================================== */
-const DEFAULT_TARGETS = { kcal: 2200, protein: 160, carbs: 230, fat: 75, fiber: 30 };
+const DEFAULT_TARGETS = { kcal: 2200, protein: 160, carbs: 230, fat: 75, fiber: 30, move: 30 };
 const MEALS = [['breakfast', 'Breakfast'], ['lunch', 'Lunch'], ['dinner', 'Dinner'], ['snack', 'Snack'], ['preworkout', 'Pre-workout'], ['postworkout', 'Post-workout']];
 const CONTEXTS = [['home', 'Home-cooked'], ['takeout', 'Takeout'], ['restaurant', 'Restaurant'], ['work', 'At work'], ['onthego', 'On the go'], ['packaged', 'Packaged'], ['social', 'Social / event'], ['other', 'Other']];
 const SOURCE_LABEL = { upc: 'Scanned', photo: 'Photo estimate', manual: 'Manual', ai: 'Described', quick: 'Quick add', usda: 'USDA' };
 const MODELS = [['claude-sonnet-5', 'Sonnet 5 · default'], ['claude-opus-5', 'Opus 5 · most capable'], ['claude-haiku-4-5', 'Haiku 4.5 · cheapest']];
+const KINDS = [['ride', 'Ride'], ['walk', 'Walk'], ['strength', 'Strength'], ['mobility', 'Mobility'], ['run', 'Run'], ['other', 'Other']];
+const KIND_LABEL = Object.fromEntries(KINDS);
+const KIND_ICON = { ride: 'bike', walk: 'walk', strength: 'dumbbell', mobility: 'stretch', run: 'run', other: 'spark' };
+// Rough METs for a calorie estimate when the source did not report one. Peloton reports its
+// own, so this mostly covers walks and weights, and it is labelled "~" everywhere it shows.
+const KIND_MET = { ride: 7, walk: 3.8, strength: 4, mobility: 2.5, run: 9, other: 4 };
+const EQUIPMENT = [['peloton', 'Peloton Bike'], ['weights', 'Dumbbells / kettlebells'], ['bands', 'Resistance bands'], ['treadmill', 'Treadmill'], ['pullup', 'Pull-up bar'], ['outdoors', 'Walking routes nearby']];
+const EQUIPMENT_LABEL = Object.fromEntries(EQUIPMENT);
 
 const state = {
   date: AZ.today(),
@@ -502,6 +540,10 @@ const state = {
 if (!state.data || typeof state.data !== 'object') state.data = { records: {} };
 if (!state.data.records) state.data.records = {};
 state.settings.targets = Object.assign({}, DEFAULT_TARGETS, state.settings.targets || {});
+// What the user is working with. It is context for every AI call, not a plan: equipment,
+// what they are open to, what is off the table for now, and an optional weight that exists
+// only so a walk or a set of weights can get a rough calorie figure.
+state.settings.profile = Object.assign({ equipment: [], open: '', avoid: '', goal: '', weightLb: null }, state.settings.profile || {});
 
 function saveData() { if (!Store.set('data', state.data)) toast('Storage is full — could not save'); }
 function saveSettings() { Store.set('settings', state.settings); }
@@ -669,6 +711,73 @@ function summaryStamp(r) {
   return 'Summarized ' + when + ' at ' + prettyTime(AZ.timeHM(at));
 }
 
+/* ---------- Workouts: energy out ----------
+   A workout is a record like an entry, so it backs up, restores and tombstones the same
+   way. Native records are the source of truth; The Howlers' read-only cache only fills in
+   days that have nothing native, so importing Howlers history never double-counts. ---------- */
+function addWorkout(w, silent) {
+  const id = w.id || uid(), now = Date.now();
+  const pos = (v, f) => (Number(v) > 0 ? f(Number(v)) : null);
+  state.data.records[id] = {
+    id, type: 'workout',
+    date: w.date || state.date, time: w.time || AZ.timeHM(),
+    kind: KIND_LABEL[w.kind] ? w.kind : 'other',
+    title: String(w.title || '').slice(0, 120),
+    minutes: Math.max(0, Math.round(Number(w.minutes) || 0)),
+    miles: pos(w.miles, v => Math.round(v * 100) / 100),
+    output: pos(w.output, Math.round),
+    kcal: pos(w.kcal, Math.round),
+    avgHr: pos(w.avgHr, Math.round),
+    source: w.source || 'manual',
+    note: w.note ? String(w.note).slice(0, 300) : '',
+    createdAt: now, updatedAt: now
+  };
+  if (!silent) saveData();
+  return id;
+}
+function updateWorkout(id, patch) { const r = state.data.records[id]; if (!r) return; Object.assign(r, patch, { updatedAt: Date.now() }); saveData(); }
+function deleteWorkout(id) { const r = state.data.records[id]; if (!r) return; state.data.records[id] = Object.assign({}, r, { deleted: true, updatedAt: Date.now() }); saveData(); }
+function workoutsFor(date) {
+  return Object.values(state.data.records).filter(r => r && r.type === 'workout' && !r.deleted && r.date === date)
+    .sort((a, b) => String(a.time || '').localeCompare(String(b.time || '')) || ((a.createdAt || 0) - (b.createdAt || 0)));
+}
+function workoutName(w) { return w.title || KIND_LABEL[w.kind] || 'Workout'; }
+function profile() { return state.settings.profile; }
+// Calories the source reported, else a MET estimate — which needs a weight, so it stays null
+// (and the UI says so) until one is entered in Settings.
+function workoutKcal(w) {
+  if (w.kcal > 0) return { kcal: w.kcal, estimated: false };
+  const lb = Number(profile().weightLb) || 0;
+  if (!lb || !w.minutes) return null;
+  return { kcal: Math.round((KIND_MET[w.kind] || 4) * (lb * 0.4536) * (w.minutes / 60)), estimated: true };
+}
+function howlerKind(type) { return Howlers.RUN_TYPES.includes(type) ? 'run' : type === 'peloton' ? 'ride' : type === 'strength' ? 'strength' : type === 'mobility' ? 'mobility' : 'other'; }
+function dayMovement(date) {
+  const ws = workoutsFor(date);
+  if (ws.length) {
+    let minutes = 0, kcal = 0, estimated = false;
+    for (const w of ws) { minutes += w.minutes || 0; const k = workoutKcal(w); if (k) { kcal += k.kcal; estimated = estimated || k.estimated; } }
+    return { n: ws.length, minutes, kcal, estimated, kinds: Array.from(new Set(ws.map(w => w.kind))), source: 'fuel', items: ws };
+  }
+  const hs = Howlers.connected() && Howlers.cache() ? Howlers.forDate(date) : [];
+  if (hs.length) return { n: hs.length, minutes: hs.reduce((s, h) => s + (h.minutes || 0), 0), kcal: 0, estimated: false, kinds: Array.from(new Set(hs.map(h => howlerKind(h.type)))), source: 'howlers',
+    items: hs.map(h => ({ kind: howlerKind(h.type), title: h.label, minutes: h.minutes, miles: h.miles })) };
+  return { n: 0, minutes: 0, kcal: 0, estimated: false, kinds: [], source: null, items: [] };
+}
+function movementLine(m) {
+  const kinds = m.items.map(i => (i.title || KIND_LABEL[i.kind]) + (i.miles ? ' ' + fmtG(i.miles) + ' mi' : ''));
+  return kinds.join(' + ') + (m.kcal ? ' · ' + (m.estimated ? '~' : '') + fmtK(m.kcal) + ' kcal out' : '');
+}
+function profileContext() {
+  const p = profile(), bits = [];
+  if (p.equipment && p.equipment.length) bits.push('equipment: ' + p.equipment.map(k => EQUIPMENT_LABEL[k] || k).join(', '));
+  if (p.open) bits.push('open to: ' + p.open);
+  if (p.avoid) bits.push('not right now: ' + p.avoid);
+  if (p.goal) bits.push('goal: ' + p.goal);
+  if (Number(p.weightLb) > 0) bits.push('weight about ' + Math.round(p.weightLb) + ' lb');
+  return bits.length ? "About the user's training — " + bits.join('; ') + '. Anything you suggest that involves exercise must fit this.' : '';
+}
+
 /* =====================================================================
    4. Rendering — log view
    ===================================================================== */
@@ -684,13 +793,21 @@ function renderHeader() {
   }
 }
 
-function ringSVG(pct) {
+function ringSVG(pct, movePct) {
   const size = 124, stroke = 10;
   const svg = svgEl('svg', { viewBox: '0 0 ' + size + ' ' + size, 'aria-hidden': 'true' });
   const r = (size - stroke) / 2, c = 2 * Math.PI * r, cx = size / 2;
   svg.appendChild(svgEl('circle', { cx, cy: cx, r, fill: 'none', stroke: 'var(--track)', 'stroke-width': stroke }));
   const fill = Math.min(1, Math.max(0, pct));
   if (fill > 0) svg.appendChild(svgEl('circle', { cx, cy: cx, r, fill: 'none', stroke: pct > 1.05 ? 'var(--danger)' : 'var(--accent)', 'stroke-width': stroke, 'stroke-dasharray': (fill * c) + ' ' + c, 'stroke-linecap': 'round', transform: 'rotate(-90 ' + cx + ' ' + cx + ')' }));
+  // Energy out rides inside energy in: a thinner blue ring of minutes moved against the day's
+  // movement target. Minutes, not calories — minutes are measured, calories are guessed.
+  if (movePct !== undefined && movePct !== null) {
+    const r2 = r - stroke - 3, c2 = 2 * Math.PI * r2, s2 = 6;
+    svg.appendChild(svgEl('circle', { cx, cy: cx, r: r2, fill: 'none', stroke: 'var(--track)', 'stroke-width': s2 }));
+    const f2 = Math.min(1, Math.max(0, movePct));
+    if (f2 > 0) svg.appendChild(svgEl('circle', { cx, cy: cx, r: r2, fill: 'none', stroke: 'var(--move)', 'stroke-width': s2, 'stroke-dasharray': (f2 * c2) + ' ' + c2, 'stroke-linecap': 'round', transform: 'rotate(-90 ' + cx + ' ' + cx + ')' }));
+  }
   return svg;
 }
 function macroRow(key, label, val, target) {
@@ -712,7 +829,8 @@ function renderSummary() {
     el('div', { class: 'big', text: fmtK(t.kcal) }),
     el('div', { class: 'small', text: 'of ' + fmtK(T.kcal) + ' kcal' }),
     el('div', { class: 'rem', text: remaining >= 0 ? fmtK(remaining) + ' left' : fmtK(-remaining) + ' over', style: remaining < 0 ? 'color:var(--danger)' : '' }));
-  const ring = el('div', { class: 'ring-wrap' }, ringSVG(pct), center);
+  const mv = dayMovement(state.date);
+  const ring = el('div', { class: 'ring-wrap', title: mv.minutes + ' of ' + (T.move || 0) + ' min moved' }, ringSVG(pct, T.move > 0 ? mv.minutes / T.move : 0), center);
   const macros = el('div', { class: 'macros' });
   for (const [key, label] of [['protein', 'Protein'], ['carbs', 'Carbs'], ['fat', 'Fat'], ['fiber', 'Fiber']]) macros.appendChild(macroRow(key, label, t[key], Number(T[key]) || 0));
   box.append(ring, macros);
@@ -738,28 +856,46 @@ function renderDayAI() {
 }
 function renderWorkoutStrip() {
   const box = $('workout-strip'); clear(box);
-  if (!Howlers.connected() || !Howlers.cache()) { box.classList.add('hidden'); return; }
+  const m = dayMovement(state.date);
+  const connected = Howlers.connected() && !!Howlers.cache();
+  if (!m.n && !connected) { box.classList.add('hidden'); return; }
   box.classList.remove('hidden');
-  const ws = Howlers.forDate(state.date);
-  box.appendChild(svgIcon(ICON.run, 18));
-  if (!ws.length) { box.appendChild(el('span', { text: 'Rest day' })); return; }
-  const parts = ws.map(w => w.label + (w.miles ? ' ' + fmtG(w.miles) + ' mi' : '') + (w.minutes ? ' · ' + w.minutes + ' min' : ''));
-  box.append(el('b', { text: ws.some(w => w.run) ? 'Run day' : 'Training day' }), el('span', { text: ' · ' + parts.join(' + ') }));
+  box.appendChild(svgIcon(ICON[KIND_ICON[m.kinds[0]]] || ICON.run, 18));
+  if (!m.n) { box.appendChild(el('span', { text: 'Rest day' })); return; }
+  box.append(el('span', {}, el('b', { text: 'Moved ' + m.minutes + ' min' }), ' · ' + movementLine(m) + (m.source === 'howlers' ? ' · from The Howlers' : '')));
+}
+function workoutCard(w) {
+  const k = workoutKcal(w);
+  // With a calorie figure the minutes join the detail line; without one they take the big slot.
+  const bits = [k && w.minutes ? w.minutes + ' min' : null, w.miles ? fmtG(w.miles) + ' mi' : null, w.output ? fmtK(w.output) + ' kJ' : null, w.avgHr ? w.avgHr + ' bpm' : null, w.time || null].filter(Boolean);
+  const meta = el('div', { class: 'meta' });
+  bits.forEach((b, i) => { meta.append(el('span', { text: b + (i < bits.length - 1 ? ' ·' : '') })); if (i < bits.length - 1) meta.append(' '); });
+  const right = k ? [el('div', { class: 'out', text: (k.estimated ? '~' : '') + fmtK(k.kcal) }), el('div', { class: 'outl', text: 'kcal out' })]
+                  : [el('div', { class: 'out', text: String(w.minutes || 0) }), el('div', { class: 'outl', text: 'min' })];
+  return el('button', { class: 'wk', type: 'button', 'aria-label': 'Edit ' + workoutName(w), onclick: () => openMoveSheet(w.id) },
+    el('div', { class: 'ico' }, svgIcon(ICON[KIND_ICON[w.kind]] || ICON.spark, 20)),
+    el('div', {}, el('div', { class: 'name', text: workoutName(w) }), meta),
+    el('div', {}, right));
 }
 function renderLog() {
   const log = $('log'); clear(log);
-  const entries = entriesFor(state.date);
-  if (!entries.length) {
+  const entries = entriesFor(state.date), workouts = workoutsFor(state.date);
+  if (!entries.length && !workouts.length) {
     log.appendChild(el('div', { class: 'empty' },
-      el('h3', { text: state.date === AZ.today() ? 'Nothing logged yet' : 'No entries this day' }),
-      el('p', { text: 'Scan a barcode, snap a photo of your plate or a nutrition label, or add something by hand.' })));
+      el('h3', { text: state.date === AZ.today() ? 'Nothing logged yet' : 'Nothing this day' }),
+      el('p', { text: 'Scan a barcode, snap a photo of your plate or a label, add food by hand — or log a ride, a walk or a set of weights.' })));
     return;
   }
-  // Meal groups run in the order the day actually happened (a 05:40 pre-workout gel sits above breakfast).
+  // The day runs in the order it actually happened: a 06:10 ride sits above breakfast, a
+  // 05:40 pre-workout gel above that. Meals group under their heading; workouts stand alone.
   const groups = MEALS.map(([mealKey, mealName]) => ({ mealKey, mealName, group: entries.filter(e => e.meal === mealKey) })).filter(g => g.group.length)
-    .map(g => Object.assign(g, { first: g.group.reduce((m, e) => (e.time && e.time < m ? e.time : m), '99:99') }))
-    .sort((a, b) => a.first.localeCompare(b.first) || mealIndex(a.mealKey) - mealIndex(b.mealKey));
-  for (const { mealKey, mealName, group } of groups) {
+    .map(g => Object.assign(g, { first: g.group.reduce((m, e) => (e.time && e.time < m ? e.time : m), '99:99') }));
+  const timeline = groups.map(g => ({ at: g.first, order: mealIndex(g.mealKey), meal: g }))
+    .concat(workouts.map(w => ({ at: w.time || '99:99', order: 50, workout: w })))
+    .sort((a, b) => a.at.localeCompare(b.at) || a.order - b.order);
+  for (const slot of timeline) {
+    if (slot.workout) { log.appendChild(workoutCard(slot.workout)); continue; }
+    const { mealKey, mealName, group } = slot.meal;
     const kcal = group.reduce((s, e) => s + entryTotals(e).kcal, 0);
     const section = el('section', { class: 'meal' },
       el('div', { class: 'meal-head' }, el('span', { class: 'meal-title', text: mealName }), el('span', { class: 'meal-kcal', text: fmtK(kcal) + ' kcal' })));
@@ -1053,13 +1189,14 @@ function buildPrompt({ text, hasImage }) {
     '{"items":[{"name":"string","portion":"string such as 1 cup (150 g)","grams":number or null,"kcal":number,"protein_g":number,"carbs_g":number,"fat_g":number,"fiber_g":number,"confidence":"low" or "medium" or "high"}],"notes":"one short sentence of caveats"}';
 }
 function dayPrompt(date) {
-  const es = entriesFor(date); const t = dayTotals(es); const T = state.settings.targets; const isToday = date === AZ.today();
+  const es = entriesFor(date); const t = dayTotals(es); const T = state.settings.targets; const isToday = date === AZ.today(); const mv = dayMovement(date);
   const lines = es.map(e => { const x = entryTotals(e); return [mealLabel(e.meal), e.time, contextLabel(e.context), e.name + (e.brand ? ' (' + e.brand + ')' : ''), fmtServ(e.servings) + ' × ' + e.serving.label, Math.round(x.kcal) + ' kcal', 'P ' + Math.round(x.protein), 'C ' + Math.round(x.carbs), 'F ' + Math.round(x.fat), 'fiber ' + Math.round(x.fiber)].join(' · '); });
   return 'Summarize ' + (isToday ? "today's" : "this day's") + ' food log for the user (second person, warm but specific, no generic advice, no medical claims). ' +
     (isToday ? 'It is now ' + AZ.timeHM() + ' Arizona time. ' : 'The day is over. ') +
     'Daily targets: ' + T.kcal + ' kcal, protein ' + T.protein + ' g, carbs ' + T.carbs + ' g, fat ' + T.fat + ' g, fiber ' + T.fiber + ' g. ' +
     'Totals so far: ' + Math.round(t.kcal) + ' kcal, protein ' + Math.round(t.protein) + ', carbs ' + Math.round(t.carbs) + ', fat ' + Math.round(t.fat) + ', fiber ' + Math.round(t.fiber) + '. ' +
-    (Howlers.forDate(date).length ? 'Workouts this day (from The Howlers): ' + Howlers.forDate(date).map(w => w.label + (w.miles ? ' ' + fmtG(w.miles) + ' mi' : '') + (w.minutes ? ' ' + w.minutes + ' min' : '')).join(', ') + '. ' : '') + '\nEntries (meal · time · context · item · portion · numbers):\n' + lines.join('\n') +
+    (mv.n ? 'Movement this day: ' + mv.items.map(i => (i.title || KIND_LABEL[i.kind]) + (i.minutes ? ' ' + i.minutes + ' min' : '') + (i.miles ? ' ' + fmtG(i.miles) + ' mi' : '') + (workoutKcal(i) ? ' ~' + workoutKcal(i).kcal + ' kcal' : '')).join(', ') + '. ' : 'No movement logged this day. ') +
+    (profileContext() ? profileContext() + ' ' : '') + '\nEntries (meal · time · context · item · portion · numbers):\n' + lines.join('\n') +
     '\n\nRespond with ONLY valid JSON, no markdown fences: {"headline":"max 10 words","summary":"2 or 3 sentences on how the day stacks up against the targets, citing the numbers","suggestions":["up to 3 short, concrete ideas for the rest of the day; an empty array if the day is over or already on track"]}';
 }
 function rangePrompt(S, range) {
@@ -1074,9 +1211,9 @@ function rangePrompt(S, range) {
     byTimeOfDay: S.hours.map(h => ({ hours: h.label, sharePct: r(h.share * 100) })),
     topFoods: S.topFoods.map(f => ({ name: f.name, times: f.count, avgKcal: r(f.avg) })),
     weekdayAvgKcal: r(S.weekday), weekendAvgKcal: r(S.weekend),
-    training: S.hasWorkouts ? { runDays: S.training.run.n, restDays: S.training.rest.n, runDayAvg: { kcal: r(S.training.run.kcal), protein: r(S.training.run.protein), carbs: r(S.training.run.carbs) }, restDayAvg: { kcal: r(S.training.rest.kcal), protein: r(S.training.rest.protein), carbs: r(S.training.rest.carbs) }, runDates: S.runDays.map(d => d.date) } : null
+    training: S.hasWorkouts ? { activeDays: S.training.active.n, restDays: S.training.rest.n, activeDayAvg: { kcal: r(S.training.active.kcal), protein: r(S.training.active.protein), carbs: r(S.training.active.carbs) }, restDayAvg: { kcal: r(S.training.rest.kcal), protein: r(S.training.rest.protein), carbs: r(S.training.rest.carbs) }, totalMinutes: r(S.movement.totalMinutes), minutesByKind: S.movement.byKind.map(b => ({ kind: b.label, minutes: r(b.minutes) })), activeDates: S.movement.days.filter(m => m.n).map(m => m.date) } : null
   };
-  return 'You are reviewing ' + range + ' days of a personal food log (Arizona). The user is training for a half marathon and wants to understand how and what they eat, not just the macros. Photo and text entries are estimates. If "training" is present, run days come from their running app (The Howlers); compare fueling on run days vs rest days. Data (JSON):\n' + JSON.stringify(compact) +
+  return 'You are reviewing ' + range + ' days of a personal food and movement log (Arizona). The user wants to understand how and what they eat, not just the macros. Photo and text entries are estimates. ' + (profileContext() ? profileContext() + ' ' : '') + 'If "training" is present, compare fueling on active days vs rest days. Data (JSON):\n' + JSON.stringify(compact) +
     '\n\nWrite for the user in second person. Be specific and grounded in these numbers, no generic advice, no medical claims. Respond with ONLY valid JSON, no markdown fences: {"headline":"one line, max 12 words","patterns":["3 to 5 observations about how and what they eat, each citing numbers"],"wins":["1 to 3 things going well"],"watchouts":["1 to 3 things to watch, each with a number"],"experiment":"one concrete thing to try next week"}';
 }
 function parseJSONLoose(raw) {
@@ -1301,6 +1438,134 @@ async function summarizeDay(date, out, btn) {
   } finally { btn.disabled = false; }
 }
 function listOf(v) { return Array.isArray(v) ? v.filter(x => x).map(x => String(x)).slice(0, 6) : []; }
+
+/* =====================================================================
+   7a. Move — logging energy out
+   ===================================================================== */
+function openMoveSheet(id) {
+  const w = id ? state.data.records[id] : null;
+  if (id && (!w || w.deleted)) return;
+  const s = openSheet({ title: w ? 'Edit workout' : 'Log movement', sub: w ? whenLabel(w) : 'A ride, a walk, weights — whatever it was' });
+  let kind = w ? w.kind : ((profile().equipment || []).includes('peloton') ? 'ride' : 'walk');
+  const PH = { ride: 'Peloton ride · e.g. 30 min Power Zone', walk: 'Neighborhood loop', strength: 'Upper body · dumbbells', mobility: 'Stretch after the ride', run: 'Easy run', other: 'What was it?' };
+  const grid = el('div', { class: 'kind-grid' }), kindBtns = {};
+  const titleIn = el('input', { type: 'text', value: w ? w.title : '', 'aria-label': 'Title', autocomplete: 'off' });
+  const minIn = numInput({ value: w && w.minutes ? String(w.minutes) : '', 'aria-label': 'Minutes', inputmode: 'numeric', placeholder: '30' });
+  const milesIn = numInput({ value: w && w.miles ? fmtG(w.miles) : '', 'aria-label': 'Miles', placeholder: 'optional' });
+  const outIn = numInput({ value: w && w.output ? String(w.output) : '', 'aria-label': 'Output kJ', inputmode: 'numeric', placeholder: 'optional' });
+  const kcalIn = numInput({ value: w && w.kcal ? String(w.kcal) : '', 'aria-label': 'Calories', inputmode: 'numeric', placeholder: 'optional' });
+  const dateIn = el('input', { type: 'date', value: w ? w.date : state.date, 'aria-label': 'Date' });
+  const timeIn = el('input', { type: 'time', value: w ? w.time : (state.date === AZ.today() ? AZ.timeHM() : '07:00'), 'aria-label': 'Time' });
+  const noteIn = el('textarea', { class: 'plain', placeholder: 'Sets and reps, how it felt, anything for later', 'aria-label': 'Note' }); noteIn.value = w ? w.note : '';
+  const est = el('div', { class: 'note' });
+  const milesField = el('div', { class: 'field' }, el('label', { text: 'Miles' }), milesIn);
+  const outField = el('div', { class: 'field' }, el('label', { text: 'Output (kJ)' }), outIn);
+  const refresh = () => {
+    for (const k in kindBtns) kindBtns[k].classList.toggle('active', k === kind);
+    titleIn.placeholder = PH[kind];
+    milesField.classList.toggle('hidden', !['ride', 'walk', 'run'].includes(kind));
+    outField.classList.toggle('hidden', kind !== 'ride');
+    const k = workoutKcal({ kind, minutes: numVal(minIn, 0), kcal: numVal(kcalIn, 0) });
+    est.textContent = numVal(kcalIn, 0) > 0 ? 'Using the calories you entered.'
+      : k ? '≈ ' + fmtK(k.kcal) + ' kcal out — a rough figure from ' + KIND_MET[kind] + ' METs at ' + Math.round(profile().weightLb) + ' lb. Enter the bike\'s number to override.'
+      : Number(profile().weightLb) > 0 ? 'Enter minutes for a rough calorie estimate.' : 'Enter the calories the bike reports, or add your weight in Settings for a rough estimate.';
+  };
+  for (const [k, l] of KINDS) {
+    const b = el('button', { class: 'kind-btn', type: 'button', 'aria-label': l }, svgIcon(ICON[KIND_ICON[k]] || ICON.spark, 20), l);
+    b.addEventListener('click', () => { kind = k; refresh(); });
+    kindBtns[k] = b; grid.appendChild(b);
+  }
+  [minIn, kcalIn].forEach(i => i.addEventListener('input', refresh));
+  refresh();
+  const save = el('button', { class: 'btn primary', type: 'button', text: w ? 'Save' : 'Add to log', onclick: () => {
+    const minutes = numVal(minIn, 0);
+    if (!(minutes > 0)) { toast('How many minutes?'); minIn.focus(); return; }
+    const date = /^\d{4}-\d{2}-\d{2}$/.test(dateIn.value) ? dateIn.value : state.date;
+    const time = /^\d{2}:\d{2}/.test(timeIn.value) ? timeIn.value.slice(0, 5) : AZ.timeHM();
+    const fields = { kind, title: titleIn.value.trim(), minutes: Math.round(minutes), miles: numVal(milesIn, 0) || null, output: numVal(outIn, 0) || null, kcal: numVal(kcalIn, 0) || null, note: noteIn.value.trim(), date, time };
+    if (w) updateWorkout(w.id, fields); else addWorkout(fields);
+    if (date !== state.date) state.date = date;
+    render(); closeSheet(); toast(w ? 'Saved' : 'Logged ' + Math.round(minutes) + ' min');
+  } });
+  const del = w ? el('button', { class: 'btn danger', type: 'button', text: 'Delete', onclick: () => showModal({ title: 'Delete workout?', message: workoutName(w) + ' will be removed from ' + AZ.pretty(w.date) + '.', confirmText: 'Delete', cancelText: 'Keep', danger: true, onConfirm: () => { deleteWorkout(w.id); render(); toast('Deleted'); closeSheet(); } }) }) : null;
+  addKids(s.body,
+    el('div', { class: 'field' }, el('label', { text: 'What' }), grid),
+    el('div', { class: 'field' }, el('label', { text: 'Title' }), titleIn),
+    el('div', { class: 'grid-2' }, el('div', { class: 'field' }, el('label', { text: 'Minutes' }), minIn), milesField),
+    el('div', { class: 'grid-2' }, outField, el('div', { class: 'field' }, el('label', { text: 'Calories' }), kcalIn)),
+    est,
+    el('div', { class: 'grid-2', style: 'margin-top:10px' }, el('div', { class: 'field' }, el('label', { text: 'Date' }), dateIn), el('div', { class: 'field' }, el('label', { text: 'Time' }), timeIn)),
+    el('div', { class: 'field' }, el('label', { text: 'Note' }), noteIn),
+    el('div', { class: 'btn-row' }, del, save));
+}
+
+/* ---------- Peloton history: the CSV from members.onepeloton.com → profile → Workouts → Download.
+   Columns are looked up by name, so a reordered export still parses; ids come from the ride's
+   timestamp, so importing the same file twice adds nothing, and a ride you deleted stays deleted. ---------- */
+function parseCSV(text) {
+  const rows = []; let row = [], field = '', q = false;
+  const t = String(text || '').replace(/^\uFEFF/, '');
+  for (let i = 0; i < t.length; i++) {
+    const ch = t[i];
+    if (q) { if (ch === '"') { if (t[i + 1] === '"') { field += '"'; i++; } else q = false; } else field += ch; }
+    else if (ch === '"') q = true;
+    else if (ch === ',') { row.push(field); field = ''; }
+    else if (ch === '\n' || ch === '\r') { if (ch === '\r' && t[i + 1] === '\n') i++; row.push(field); rows.push(row); row = []; field = ''; }
+    else field += ch;
+  }
+  if (field.length || row.length) { row.push(field); rows.push(row); }
+  return rows.filter(r => r.some(c => c.trim() !== ''));
+}
+const PELOTON_KIND = { cycling: 'ride', walking: 'walk', running: 'run', strength: 'strength', stretching: 'mobility', yoga: 'mobility', cardio: 'other', 'bike bootcamp': 'other', 'tread bootcamp': 'other', rowing: 'other', 'row bootcamp': 'other', outdoor: 'walk' };
+function parsePelotonCSV(text) {
+  const rows = parseCSV(text);
+  if (rows.length < 2) return { workouts: [], skipped: 0, reason: 'empty' };
+  const head = rows[0].map(h => h.trim().toLowerCase());
+  const col = (...names) => { for (const n of names) { const i = head.findIndex(h => h === n || h.startsWith(n)); if (i >= 0) return i; } return -1; };
+  const C = { ts: col('workout timestamp'), len: col('length (minutes)', 'length'), disc: col('fitness discipline'), title: col('title'), out: col('total output'), dist: col('distance (mi)', 'distance'), kcal: col('calories burned', 'calories'), hr: col('avg. heartrate', 'avg heartrate', 'avg. heart rate'), inst: col('instructor name', 'instructor') };
+  if (C.ts < 0 || C.disc < 0) return { workouts: [], skipped: rows.length - 1, reason: 'not-peloton' };
+  const get = (r, i) => (i >= 0 && i < r.length ? String(r[i]).trim() : '');
+  const num = (v) => { const n = parseFloat(String(v).replace(/[^0-9.]/g, '')); return Number.isFinite(n) && n > 0 ? n : null; };
+  const workouts = []; let skipped = 0;
+  for (const r of rows.slice(1)) {
+    const m = get(r, C.ts).match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2})/);
+    const disc = get(r, C.disc).toLowerCase();
+    const minutes = Math.round(num(get(r, C.len)) || 0);
+    if (!m || !disc || disc === 'meditation' || !minutes) { skipped++; continue; }
+    const title = get(r, C.title), inst = get(r, C.inst);
+    let kind = PELOTON_KIND[disc] || 'other';
+    if (disc === 'outdoor' && /run/i.test(title)) kind = 'run';
+    workouts.push({ id: 'wk_pel_' + m[1] + '_' + m[2].replace(':', '') + '_' + kind, date: m[1], time: m[2], kind, title: title || (cap(disc) + ' · Peloton'),
+      minutes, miles: num(get(r, C.dist)), output: num(get(r, C.out)), kcal: num(get(r, C.kcal)), avgHr: num(get(r, C.hr)), source: 'peloton', note: inst ? 'with ' + inst : '' });
+  }
+  return { workouts, skipped, reason: null };
+}
+// An id that already exists — live or tombstoned — is left alone, so a re-import cannot
+// resurrect something the user removed. One save at the end rather than one per row.
+function importWorkouts(list) {
+  let added = 0, already = 0;
+  for (const w of list) { if (state.data.records[w.id]) { already++; continue; } addWorkout(w, true); added++; }
+  if (added) saveData();
+  return { added, already };
+}
+async function importPelotonFile(file) {
+  let text; try { text = await file.text(); } catch (e) { toast('Could not read that file'); return; }
+  const r = parsePelotonCSV(text);
+  if (r.reason === 'not-peloton') { toast('That does not look like a Peloton workouts export'); return; }
+  if (!r.workouts.length) { toast('No workouts found in that file'); return; }
+  const fresh = r.workouts.filter(w => !state.data.records[w.id]).length;
+  showModal({ title: 'Import Peloton history?',
+    message: 'The file holds ' + r.workouts.length + ' workouts' + (r.skipped ? ' (' + r.skipped + ' rows skipped)' : '') + '. ' + (fresh ? fresh + ' are new; the rest are already here and will not be duplicated.' : 'All of them are already here.'),
+    confirmText: fresh ? 'Import ' + fresh : 'OK', cancelText: 'Cancel',
+    onConfirm: () => { if (!fresh) return; const res = importWorkouts(r.workouts); render(); closeSheet(); toast('Imported ' + res.added + ' workouts'); } });
+}
+// The Howlers will sunset; this keeps the history. Same dedupe, same tombstone respect.
+function importFromHowlers() {
+  const c = Howlers.cache(); if (!c || !c.byDate) return { added: 0, already: 0 };
+  const list = [];
+  for (const [date, ws] of Object.entries(c.byDate)) ws.forEach((h, i) => { if (h.minutes > 0 || h.miles > 0) list.push({ id: 'wk_howl_' + date + '_' + h.type + '_' + i, date, time: '07:00', kind: howlerKind(h.type), title: h.label, minutes: h.minutes || 0, miles: h.miles || null, source: 'howlers' }); });
+  return importWorkouts(list);
+}
 
 /* =====================================================================
    7b. The Howlers — read-only workouts from the Howlers Gist. Both apps live on ortizzle.github.io, so the
@@ -2045,8 +2310,24 @@ async function restoreFromFile(file, onDone) {
 function openSettings() {
   const s = openSheet({ title: 'Settings', sub: 'Targets, appearance, Claude, data' });
   const T = state.settings.targets;
-  const tIn = {}; for (const k of ['kcal', 'protein', 'carbs', 'fat', 'fiber']) tIn[k] = numInput({ value: String(T[k]), 'aria-label': k + ' target' });
+  const tIn = {}; for (const k of ['kcal', 'protein', 'carbs', 'fat', 'fiber', 'move']) tIn[k] = numInput({ value: String(T[k]), 'aria-label': k + ' target' });
   const saveTargets = () => { for (const k in tIn) { const v = numVal(tIn[k], T[k]); if (v > 0) T[k] = Math.round(v); } saveSettings(); renderSummary(); };
+  const P = state.settings.profile;
+  const checks = el('div', { class: 'checks' }, EQUIPMENT.map(([k, l]) => {
+    const cb = el('input', { type: 'checkbox', checked: (P.equipment || []).includes(k) ? true : null, 'aria-label': l });
+    cb.addEventListener('change', () => { P.equipment = EQUIPMENT.map(e => e[0]).filter(e => e === k ? cb.checked : (P.equipment || []).includes(e)); saveSettings(); });
+    return el('label', { class: 'check' }, cb, l);
+  }));
+  const openIn = el('input', { type: 'text', value: P.open || '', placeholder: 'walking, rides on the bike', 'aria-label': 'Open to', autocomplete: 'off' });
+  const avoidIn = el('input', { type: 'text', value: P.avoid || '', placeholder: 'running for now — joint load', 'aria-label': 'Not right now', autocomplete: 'off' });
+  const goalIn = el('input', { type: 'text', value: P.goal || '', placeholder: 'move most days, lose weight steadily', 'aria-label': 'Goal', autocomplete: 'off' });
+  const wtIn = numInput({ value: P.weightLb ? String(P.weightLb) : '', placeholder: 'optional', 'aria-label': 'Weight in pounds' });
+  const saveProfile = () => { P.open = openIn.value.trim(); P.avoid = avoidIn.value.trim(); P.goal = goalIn.value.trim(); const w = numVal(wtIn, 0); P.weightLb = w > 0 ? Math.round(w) : null; saveSettings(); renderSummary(); renderWorkoutStrip(); renderLog(); };
+  [openIn, avoidIn, goalIn, wtIn].forEach(i => i.addEventListener('change', saveProfile));
+  const pelIn = el('input', { type: 'file', accept: '.csv,text/csv', class: 'hidden', 'aria-label': 'Peloton workouts CSV' });
+  pelIn.addEventListener('change', async () => { const f = pelIn.files && pelIn.files[0]; pelIn.value = ''; if (f) await importPelotonFile(f); });
+  const howlImport = Howlers.connected() && Howlers.cache() ? el('button', { class: 'btn', type: 'button', text: 'Import Howlers history', onclick: () => { const r = importFromHowlers(); render(); toast(r.added ? 'Imported ' + r.added + ' workouts' + (r.already ? ' · ' + r.already + ' already here' : '') : 'Nothing new to import'); } }) : null;
+  const workoutCount = Object.values(state.data.records).filter(r => r.type === 'workout' && !r.deleted).length;
   Object.values(tIn).forEach(i => i.addEventListener('change', saveTargets));
   const scheme = segControl([['system', 'System'], ['light', 'Light'], ['dark', 'Dark']], state.settings.scheme || 'system', (v) => applyScheme(v));
   const modelSel = el('select', { 'aria-label': 'Claude model' }, MODELS.map(([v, l]) => el('option', { value: v, text: l, selected: v === currentModel() ? true : null })));
@@ -2077,7 +2358,7 @@ function openSettings() {
   const stats = el('div', { class: 'note', text: entryCount + ' entries stored on this device · ' + Object.keys(Store.get('products', {}) || {}).length + ' remembered barcodes' });
   s.body.append(
     el('div', { class: 'field' }, el('label', { text: 'Daily targets' }),
-      el('div', { class: 'grid-2' }, el('div', { class: 'field' }, el('label', { text: 'Calories' }), tIn.kcal), el('div', { class: 'field' }, el('label', { text: 'Fiber g' }), tIn.fiber)),
+      el('div', { class: 'grid-3' }, el('div', { class: 'field' }, el('label', { text: 'Calories' }), tIn.kcal), el('div', { class: 'field' }, el('label', { text: 'Fiber g' }), tIn.fiber), el('div', { class: 'field' }, el('label', { text: 'Move min' }), tIn.move)),
       el('div', { class: 'grid-3' }, el('div', { class: 'field' }, el('label', { text: 'Protein g' }), tIn.protein), el('div', { class: 'field' }, el('label', { text: 'Carbs g' }), tIn.carbs), el('div', { class: 'field' }, el('label', { text: 'Fat g' }), tIn.fat))),
     el('div', { class: 'field' }, el('label', { text: 'Appearance' }), scheme),
     el('div', { class: 'field', style: 'margin-top:16px' }, el('label', { text: 'Claude API key (photos, descriptions, summaries)' }), keyRow,
@@ -2086,6 +2367,17 @@ function openSettings() {
       el('div', { class: 'note', text: 'Sonnet 5 is the default: fast and cheap for photos and summaries. Switch to Opus 5 if estimates feel off.' })),
     el('div', { class: 'field' }, el('label', { text: 'USDA FoodData Central key (barcode fallback + food search)' }), usdaRow,
       el('div', { class: 'note' }, 'Free, instant signup at ', el('a', { href: 'https://fdc.nal.usda.gov/api-key-signup', target: '_blank', rel: 'noopener', text: 'fdc.nal.usda.gov' }), '. Until then, lookups use USDA\'s shared demo key (about 30 an hour).')),
+    el('div', { class: 'field', style: 'margin-top:16px' }, el('label', { text: 'Movement — what you are working with' }),
+      el('div', { class: 'note', style: 'margin-top:0' }, 'Claude reads this before it says anything about exercise. It is context, not a plan.'),
+      checks,
+      el('div', { class: 'field', style: 'margin-top:10px' }, el('label', { text: 'Open to' }), openIn),
+      el('div', { class: 'field' }, el('label', { text: 'Not right now' }), avoidIn),
+      el('div', { class: 'field' }, el('label', { text: 'Goal' }), goalIn),
+      el('div', { class: 'grid-2' }, el('div', { class: 'field' }, el('label', { text: 'Weight (lb)' }), wtIn), el('div')),
+      el('div', { class: 'note', style: 'margin-top:-4px' }, 'Weight is used only to put a rough calorie figure on walks and weights. Nothing is tracked.'),
+      el('div', { class: 'note' }, workoutCount + (workoutCount === 1 ? ' workout' : ' workouts') + ' logged on this device.'),
+      el('div', { class: 'btn-row' }, el('button', { class: 'btn', type: 'button', onclick: () => pelIn.click() }, svgIcon(ICON.upload, 18), 'Import Peloton CSV'), howlImport), pelIn,
+      el('div', { class: 'note' }, 'Peloton: members.onepeloton.com → your profile → Workouts → Download. Re-importing never duplicates a ride.')),
     el('div', { class: 'field', style: 'margin-top:16px' }, el('label', { text: 'The Howlers workouts' }), howlersBox),
     el('div', { class: 'field', style: 'margin-top:16px' }, el('label', { text: 'Backup' }), stats, backupAge,
       el('div', { class: 'btn-row' }, shareBtn, downloadBtn),
@@ -2097,7 +2389,7 @@ function openSettings() {
         el('button', { class: 'btn', type: 'button', text: 'Copy JSON', onclick: () => { clear(exportBox); const ta = el('textarea', { readonly: true, 'aria-label': 'Exported data', style: 'min-height:140px;font-family:ui-monospace,monospace;font-size:12px' }); ta.value = JSON.stringify(backupPayload(), null, 1); exportBox.append(ta, el('button', { class: 'btn ghost', type: 'button', text: 'Copy to clipboard', onclick: async () => { try { await navigator.clipboard.writeText(ta.value); toast('Copied'); } catch (e) { ta.select(); toast('Select all and copy'); } } })); } })),
       exportBox,
       el('button', { class: 'btn danger', type: 'button', text: 'Clear all data on this device', style: 'margin-top:10px', onclick: () => showModal({ title: 'Clear everything?', message: 'All logged entries and remembered barcodes on this device will be erased. Keys and targets stay.', confirmText: 'Erase', cancelText: 'Keep', danger: true, onConfirm: () => { state.data = { records: {} }; saveData(); Store.remove('products'); render(); closeSheet(); toast('Cleared'); } }) })),
-    el('div', { class: 'note', style: 'margin-top:18px' }, 'Fuel prototype v0.3 · data lives on this device, so back it up · dates use Arizona time'));
+    el('div', { class: 'note', style: 'margin-top:18px' }, 'Fuel v0.4 · Move prototype · data lives on this device, so back it up · dates use Arizona time'));
 }
 
 /* ---------- Deterministic sample data: two weeks with realistic variety, so Insights has something to say ---------- */
@@ -2137,6 +2429,10 @@ function seedSampleDays(n) {
   for (let i = n - 1; i >= 0; i--) {
     const date = AZ.addDays(today, -i); const dow = AZ.weekday(date);
     const weekend = dow === 0 || dow === 6; const runDay = dow === 2 || dow === 4 || dow === 6;
+    const addW = (w) => { if (date === today && w.time > nowHM) return; addWorkout(Object.assign({ date }, w)); };
+    if (runDay) { const min = pick([30, 45, 30, 45, 20]); const out = Math.round(min * (8 + rnd() * 3)); addW({ time: '06:10', kind: 'ride', title: min + ' min ' + pick(['Power Zone Ride', 'Climb Ride', 'Low Impact Ride', 'Power Zone Endurance Ride']), minutes: min, miles: Math.round(min * (0.28 + rnd() * 0.08) * 10) / 10, output: out, kcal: Math.round(out * (1.0 + rnd() * 0.15)), source: 'peloton', note: 'with ' + pick(['Matt Wilpers', 'Denis Morton', 'Christine D\'Ercole', 'Ben Alldis']) }); }
+    else if (dow === 1 || dow === 3) addW({ time: '06:30', kind: 'strength', title: pick(['Upper body · dumbbells', 'Lower body · kettlebell', 'Full body · 3 rounds']), minutes: pick([20, 25, 30]) });
+    else if (dow === 0 && rnd() < 0.8) addW({ time: '08:05', kind: 'walk', title: 'Neighborhood loop', minutes: pick([35, 40, 50]), miles: pick([1.8, 2.1, 2.6]) });
     if (runDay) add(date, 'preworkout', '05:40', 'home', F.gel);
     add(date, 'breakfast', weekend ? '08:30' : '07:05', 'home', F.coffee, 2);
     add(date, 'breakfast', weekend ? '08:40' : '07:10', 'home', pick([F.oats, F.eggs, F.yogurt, F.oats]));
@@ -2194,18 +2490,26 @@ function computeStats(days) {
   const hours = byHour.map((k, i) => ({ label: HOUR_BUCKETS[i][0], name: HOUR_BUCKETS[i][1], kcal: k, share: k / totalK }));
   const topFoods = Object.values(foods).sort((a, b) => b.count - a.count || b.kcal - a.kcal).slice(0, 8).map(f => ({ name: f.name, count: f.count, avg: f.kcal / f.count }));
   const pk = avg.protein * 4, ck = avg.carbs * 4, fk = avg.fat * 9, mk = (pk + ck + fk) || 1;
-  const hasWorkouts = Howlers.connected() && !!Howlers.cache();
-  const runDays = hasWorkouts ? logged.filter(d => Howlers.forDate(d.date).some(w => w.run)) : [];
-  const restDays = hasWorkouts ? logged.filter(d => !Howlers.forDate(d.date).some(w => w.run)) : [];
+  // Energy out, day by day: native workouts first, The Howlers filling any day with nothing native.
+  const mvOf = {}; perDay.forEach(d => { mvOf[d.date] = dayMovement(d.date); });
+  const moveDays = perDay.map(d => { const m = mvOf[d.date]; return { date: d.date, n: m.n, minutes: m.minutes, kcal: m.kcal, kinds: m.kinds, source: m.source }; });
+  const kindMin = {};
+  for (const d of perDay) for (const it of mvOf[d.date].items) kindMin[it.kind] = (kindMin[it.kind] || 0) + (it.minutes || 0);
+  const totalMinutes = moveDays.reduce((s, m) => s + m.minutes, 0);
+  const byKind = KINDS.map(([k, l]) => kindMin[k] ? { kind: k, label: l, minutes: kindMin[k], share: kindMin[k] / (totalMinutes || 1) } : null).filter(Boolean).sort((a, b) => b.minutes - a.minutes);
+  const movement = { days: moveDays, activeDays: moveDays.filter(m => m.n).length, totalMinutes, totalKcal: moveDays.reduce((s, m) => s + m.kcal, 0), byKind, target: Number(T.move) || 0 };
+  const hasWorkouts = movement.activeDays > 0 || (Howlers.connected() && !!Howlers.cache());
+  const activeDays = logged.filter(d => mvOf[d.date].n > 0);
+  const restDays = logged.filter(d => mvOf[d.date].n === 0);
   const avgOf = (arr, k) => arr.length ? arr.reduce((s, d) => s + d.totals[k], 0) / arr.length : 0;
-  const training = { run: { n: runDays.length, kcal: avgOf(runDays, 'kcal'), protein: avgOf(runDays, 'protein'), carbs: avgOf(runDays, 'carbs') }, rest: { n: restDays.length, kcal: avgOf(restDays, 'kcal'), protein: avgOf(restDays, 'protein'), carbs: avgOf(restDays, 'carbs') } };
-  return { days: perDay, n, avg, kcalHit, overDays, proteinHit, contexts, meals, hours, topFoods, split: { protein: pk / mk, carbs: ck / mk, fat: fk / mk }, weekday: weekdayN ? weekdayK / weekdayN : 0, weekend: weekendN ? weekendK / weekendN : 0, targets: T, hasWorkouts, runDays, restDays, training };
+  const training = { active: { n: activeDays.length, kcal: avgOf(activeDays, 'kcal'), protein: avgOf(activeDays, 'protein'), carbs: avgOf(activeDays, 'carbs') }, rest: { n: restDays.length, kcal: avgOf(restDays, 'kcal'), protein: avgOf(restDays, 'protein'), carbs: avgOf(restDays, 'carbs') } };
+  return { days: perDay, n, avg, kcalHit, overDays, proteinHit, contexts, meals, hours, topFoods, split: { protein: pk / mk, carbs: ck / mk, fat: fk / mk }, weekday: weekdayN ? weekdayK / weekdayN : 0, weekend: weekendN ? weekendK / weekendN : 0, targets: T, hasWorkouts, activeDays, restDays, training, movement };
 }
 function niceStep(max) {
   const raw = Math.max(1, max) / 3; const pow = Math.pow(10, Math.floor(Math.log10(raw))); const f = raw / pow;
   return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * pow;
 }
-function columnChart(container, { items, target, tipText, unit = '', height = 170, labelMax = false }) {
+function columnChart(container, { items, target, tipText, unit = '', height = 170, labelMax = false, fill = 'var(--bar)' }) {
   clear(container);
   const width = Math.max(240, Math.min(560, container.clientWidth || 358));
   const padL = 36, padR = 8, padT = 14, padB = 22;
@@ -2224,7 +2528,7 @@ function columnChart(container, { items, target, tipText, unit = '', height = 17
   items.forEach((it, i) => {
     const x = padL + slot * i + (slot - bw) / 2; const yTop = y(it.value); const h = Math.max(0, padT + plotH - yTop);
     const r = Math.min(4, bw / 2, h);
-    if (h > 0) svg.appendChild(svgEl('path', { d: 'M' + x + ',' + (padT + plotH) + ' v' + (-(h - r)) + ' a' + r + ',' + r + ' 0 0 1 ' + r + ',' + (-r) + ' h' + (bw - 2 * r) + ' a' + r + ',' + r + ' 0 0 1 ' + r + ',' + r + ' v' + (h - r) + ' z', fill: it.over ? 'var(--danger)' : 'var(--bar)' }));
+    if (h > 0) svg.appendChild(svgEl('path', { d: 'M' + x + ',' + (padT + plotH) + ' v' + (-(h - r)) + ' a' + r + ',' + r + ' 0 0 1 ' + r + ',' + (-r) + ' h' + (bw - 2 * r) + ' a' + r + ',' + r + ' 0 0 1 ' + r + ',' + r + ' v' + (h - r) + ' z', fill: it.over ? 'var(--danger)' : fill }));
     if (it.label) { const t = svgEl('text', { x: x + bw / 2, y: height - 6, 'text-anchor': 'middle' }); t.textContent = it.label; svg.appendChild(t); }
     if (labelMax && it === maxItem && it.value > 0) { const t = svgEl('text', { x: x + bw / 2, y: yTop - 5, 'text-anchor': 'middle', style: 'fill:var(--ink);font-weight:600' }); t.textContent = fmtK(it.value) + unit; svg.appendChild(t); }
     const hit = svgEl('rect', { class: 'hit', x: padL + slot * i, y: padT, width: slot, height: plotH, tabindex: '0' });
@@ -2292,14 +2596,27 @@ function renderInsights() {
   const c4 = el('section', { class: 'card' }, el('h3', { text: 'By meal' }), el('div', { class: 'sub', text: 'Share of calories · average per logged day' }));
   const rows4 = el('div', { class: 'rows' }); c4.appendChild(rows4); box.appendChild(c4);
   rowBars(rows4, S.meals.map(m => ({ label: m.label, v: m.kcal, text: Math.round(m.share * 100) + '% · ' + fmtK(m.perDay) + ' / day' })));
-  // Training days (from The Howlers)
+  // Movement — energy out, in minutes because minutes are measured and calories are guessed
+  const M = S.movement;
+  if (M.activeDays) {
+    const c4b = el('section', { class: 'card' }, el('h3', { text: 'Movement' }), el('div', { class: 'sub', text: 'Minutes per day · target ' + M.target + ' min' }));
+    c4b.appendChild(el('div', { class: 'stats' }, stat(M.activeDays + ' / ' + days.length, 'active days'), stat(fmtK(M.totalMinutes), 'minutes'), stat(M.totalKcal ? '~' + fmtK(M.totalKcal) : '—', 'kcal out')));
+    const chartM = el('div', { class: 'chart' }); c4b.appendChild(chartM);
+    c4b.appendChild(tableToggle(M.days.map(m => [AZ.pretty(m.date), m.n ? String(m.minutes) : '—', m.n ? m.kinds.map(k => KIND_LABEL[k]).join(', ') : '—']), ['Day', 'Min', 'What']));
+    const rowsM = el('div', { class: 'rows' }); c4b.appendChild(rowsM);
+    box.appendChild(c4b);
+    columnChart(chartM, { items: M.days.map(m => ({ label: xLabel(m.date, range), value: m.minutes, over: false, m })), target: M.target, fill: 'var(--move)', tipText: (it) => AZ.pretty(it.m.date) + ' · ' + it.value + ' min' + (it.m.kinds.length ? ' · ' + it.m.kinds.map(k => KIND_LABEL[k]).join(', ') : '') });
+    rowBars(rowsM, M.byKind.map(b => ({ label: b.label, v: b.minutes, text: fmtK(b.minutes) + ' min · ' + Math.round(b.share * 100) + '%' })));
+  }
+  // Active days vs rest days
   if (S.hasWorkouts) {
     const Tr = S.training;
     const cell = (k, v) => el('td', { text: k === 'kcal' ? fmtK(v) : fmtG(v) + ' g' });
-    const c45 = el('section', { class: 'card' }, el('h3', { text: 'Run days vs rest days' }), el('div', { class: 'sub', text: 'Runs from The Howlers · daily averages in this range' }),
-      el('table', { class: 'table' }, el('thead', {}, el('tr', {}, el('th', { text: '' }), el('th', { text: 'Run days (' + Tr.run.n + ')' }), el('th', { text: 'Rest days (' + Tr.rest.n + ')' }))),
-        el('tbody', {}, [['Calories', 'kcal'], ['Protein', 'protein'], ['Carbs', 'carbs']].map(([l, k]) => el('tr', {}, el('td', { text: l }), cell(k, Tr.run[k]), cell(k, Tr.rest[k]))))));
-    if (!Tr.run.n) c45.appendChild(el('div', { class: 'note', text: 'No run days in this range yet.' }));
+    const fromHowlers = M.days.some(m => m.source === 'howlers');
+    const c45 = el('section', { class: 'card' }, el('h3', { text: 'Active days vs rest days' }), el('div', { class: 'sub', text: 'Daily averages in this range' + (fromHowlers ? ' · some days from The Howlers' : '') }),
+      el('table', { class: 'table' }, el('thead', {}, el('tr', {}, el('th', { text: '' }), el('th', { text: 'Active days (' + Tr.active.n + ')' }), el('th', { text: 'Rest days (' + Tr.rest.n + ')' }))),
+        el('tbody', {}, [['Calories', 'kcal'], ['Protein', 'protein'], ['Carbs', 'carbs']].map(([l, k]) => el('tr', {}, el('td', { text: l }), cell(k, Tr.active[k]), cell(k, Tr.rest[k]))))));
+    if (!Tr.active.n) c45.appendChild(el('div', { class: 'note', text: 'No active days in this range yet.' }));
     box.appendChild(c45);
   }
   // When
@@ -2371,6 +2688,9 @@ function init() {
     const b = $('preview-banner'); b.textContent = 'Preview build with two sample weeks loaded. Camera scanning and barcode lookup need the real deployment (network is blocked here); the log, insights, manual entry and appearance are fully live, and Claude features run through the preview host.';
     b.classList.remove('hidden');
     if (!Store.get('seeded_v2') && Object.values(state.data.records).filter(r => r.type === 'entry' && !r.deleted).length === 0) { seedSampleDays(14); Store.set('seeded_v2', true); }
+    // Sample profile so the preview shows what an informed Claude looks like. Real installs start blank.
+    const pf = state.settings.profile;
+    if (!pf.open && !pf.avoid && !(pf.equipment || []).length) { Object.assign(pf, { equipment: ['peloton', 'weights', 'outdoors'], open: 'walking, and rides on the bike', avoid: 'running for now — carrying extra weight, keeping the joints happy', goal: 'move most days, lose weight steadily', weightLb: 220 }); saveSettings(); }
   }
   $('date-prev').addEventListener('click', () => { state.date = AZ.addDays(state.date, -1); render(); });
   $('date-next').addEventListener('click', () => { state.date = AZ.addDays(state.date, 1); render(); });
@@ -2381,6 +2701,7 @@ function init() {
   $('cap-scan').addEventListener('click', () => openScanSheet());
   $('cap-photo').addEventListener('click', () => openPhotoSheet());
   $('cap-add').addEventListener('click', () => openAddSheet());
+  $('cap-move').addEventListener('click', () => openMoveSheet());
   document.addEventListener('visibilitychange', () => { if (document.hidden) Scanner.stop(); });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSheet(); });
   let resizeTimer = null;
@@ -2390,7 +2711,7 @@ function init() {
   AI.init();
   if (Howlers.connected()) Howlers.refresh(false).then(() => { renderWorkoutStrip(); if (state.view === 'insights') renderInsights(); }).catch(() => {});
 }
-window.Fuel = { state, AZ, Store, Howlers, getSummary, saveSummary, dropSummary, daySummaryId, rangeSummaryId, dayFingerprint, rangeFingerprint, summarizeDay, recentFoods, savedMeals, saveMealFrom, deleteSavedMeal, logSavedMeal, photoTimestamp, parseExifDate, guessMeal, defaultContext, addEntry, updateEntry, deleteEntry, entriesFor, dayTotals, computeStats, render, renderInsights, showView, Scanner, FoodDB, AI, parseEstimate, parseJSONLoose, normalizeOFF, normalizeUSDA, normalizeBarcode, upcEToA, codeVariants, openScanSheet, openPhotoSheet, openAddSheet, openEditSheet, openSettings, seedSampleDays, applyScheme, closeSheet, MEALS, CONTEXTS };
+window.Fuel = { state, AZ, Store, Howlers, addWorkout, updateWorkout, deleteWorkout, workoutsFor, dayMovement, workoutKcal, parseCSV, parsePelotonCSV, importWorkouts, importFromHowlers, openMoveSheet, profileContext, KINDS, getSummary, saveSummary, dropSummary, daySummaryId, rangeSummaryId, dayFingerprint, rangeFingerprint, summarizeDay, recentFoods, savedMeals, saveMealFrom, deleteSavedMeal, logSavedMeal, photoTimestamp, parseExifDate, guessMeal, defaultContext, addEntry, updateEntry, deleteEntry, entriesFor, dayTotals, computeStats, render, renderInsights, showView, Scanner, FoodDB, AI, parseEstimate, parseJSONLoose, normalizeOFF, normalizeUSDA, normalizeBarcode, upcEToA, codeVariants, openScanSheet, openPhotoSheet, openAddSheet, openEditSheet, openSettings, seedSampleDays, applyScheme, closeSheet, MEALS, CONTEXTS };
 init();
 })();
 </script>

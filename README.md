@@ -28,6 +28,10 @@ Every entry carries a **meal** (Breakfast, Lunch, Dinner, Snack, Pre-workout, Po
 
 **Summaries stay put.** What Claude writes is saved with the day it describes, so stepping to another date, closing the app or rebooting the phone all bring it back rather than throwing it away — one summary per day, one analysis per range, each stamped with when it ran. Log something after the fact and the card stays on screen with a note that the day has moved on, so you choose whether to spend another call re-running it. Summaries ride along in backups like everything else, and day summaries older than 90 days are dropped to keep the file small.
 
+**Move — energy out.** A fourth capture button logs a ride, walk, strength session, mobility, run or anything else: minutes, and for rides miles and output, with the bike's own calorie figure when you have it. Workouts sit in the day's timeline beside the meals (a 06:10 ride above breakfast), a thinner blue ring inside the calorie ring shows minutes moved against a daily movement target, and the strip under the ring sums the day. Calories out are the source's number where there is one; otherwise a rough MET estimate marked `~`, and only once a weight is entered in Settings — with no weight, a walk shows minutes rather than a made-up figure. Peloton history imports from the CSV the site exports (columns matched by name, ids from the ride's timestamp, so re-importing never duplicates and a deleted ride stays deleted), and Howlers history imports in one tap ahead of that app's sunset. Insights gains a Movement card (minutes per day, active days, by kind) and the run-vs-rest comparison becomes active-vs-rest from Fuel's own records.
+
+**What Claude knows about you.** Settings holds a short training profile — equipment, what you are open to, what is off the table for now, a goal, and an optional weight for estimates. It is context, not a plan: every day summary and range analysis carries it, so anything Claude says about exercise starts from what you are actually working with.
+
 **The Howlers hook** (read-only): on a phone that also runs The Howlers, Fuel picks up the Howlers Gist keys from the shared `ortizzle.github.io` storage and shows the day's workout under the ring (run day / training day / rest day), splits Insights into run vs rest days, and tells Claude which days were runs. On another device, paste the Gist ID and token in Settings. Nothing is ever written to the Howlers Gist.
 
 ## The look
@@ -39,6 +43,7 @@ Every entry carries a **meal** (Breakfast, Lunch, Dinner, Snack, Pre-workout, Po
 - **Daily targets** for calories, protein, carbs, fat, fiber.
 - **Claude API key** (photos, descriptions, summaries). Stored only in this browser; calls go straight from the phone to Anthropic. Set a monthly spend limit on the key. Model: Sonnet 5 by default, Opus 5 or Haiku 4.5 selectable.
 - **USDA key** (optional, free): removes the shared demo-key limit for barcode fallback and search.
+- **Movement**: equipment, open to / not right now / goal, weight for estimates only, a daily minutes target (with the other targets), Peloton CSV import, Howlers import.
 - **The Howlers**: connection status, refresh, whose workouts.
 - **Backup**: save a dated JSON file holding the log, targets and remembered barcodes. On Android the share sheet sends it straight to Drive; elsewhere it downloads. Restoring merges by entry, newest wins, so an old file can never delete newer work or resurrect something you deleted. The panel shows how long it has been and turns amber after two weeks.
 - **Data**: load two sample weeks, copy the JSON, clear this device.
@@ -54,6 +59,9 @@ entry = { id, type:'entry', date:'YYYY-MM-DD' (AZ), meal, context, time,
 savedmeal = { id, type:'savedmeal', name, meal, items:[...], createdAt, updatedAt, deleted? }
 summary  = { id:'sum_day_<date>' | 'sum_range_<7|14|30>', type:'summary', kind:'day'|'range',
              date | range + endDate, model, fingerprint, result, createdAt, updatedAt, deleted? }
+workout  = { id (wk_pel_<date>_<hhmm>_<kind> for Peloton imports, wk_howl_… for Howlers), type:'workout',
+             date, time, kind:'ride'|'walk'|'strength'|'mobility'|'run'|'other', title, minutes,
+             miles?, output?, kcal?, avgHr?, source:'manual'|'peloton'|'howlers', note, createdAt, updatedAt, deleted? }
 localStorage fuel_settings  { targets, scheme, model }
 localStorage fuel_products  { <barcode>: product }          remembered scans / custom products
 localStorage fuel_howlers_cache                              workouts by date (read-only mirror)

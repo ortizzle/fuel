@@ -102,6 +102,25 @@ letters always sit beside the numbers so identity never depends on colour alone.
   newest `updatedAt`, workout count); when it no longer matches, the card is marked stale
   rather than hidden. Summaries untouched for `SUMMARY_KEEP_DAYS` are pruned on the next save
   — by when they were *written*, not the day they cover, so summarizing an old day still keeps it.
+- **Workouts are records too** (`type:'workout'`), so they ride along in backups, restore-merge and
+  tombstones without any extra code. `dayMovement(date)` is the one place that decides what a day's
+  movement is: native records if there are any, else The Howlers' read-only cache — never both, so
+  importing Howlers history cannot double-count. Everything that reads the log still filters on
+  `type === 'entry'`, so entries and workouts never leak into each other's totals.
+- **Energy out is blue (`--move`), energy in is brass.** The inner ring is *minutes* against
+  `targets.move`, not calories — minutes are measured, calories are guessed. `workoutKcal()` returns
+  the source's figure when there is one, a MET estimate flagged `estimated` only when a weight is on
+  file, and `null` otherwise; the UI shows minutes rather than inventing a number.
+- **Peloton ids come from the row's timestamp** (`wk_pel_<date>_<hhmm>_<kind>`), so re-importing the
+  same export adds nothing and a ride the user deleted stays a tombstone. Columns are matched by
+  header name, not position. The parser was written against the documented export format; confirm it
+  against a real file the first time.
+- **The training profile is context, not a plan.** `profileContext()` is injected into every AI
+  prompt. The old hardcoded "training for a half marathon" line is gone — do not put personal
+  assumptions in prompt text; they belong in Settings where the user can change them.
+- **`.field label` is `display:block` and ties with any `.x label` rule.** A label that needs to be
+  flex (the equipment checkboxes) must outrank it — `.checks label.check` — and a checkbox inside a
+  sheet needs the global input rule's `min-height: 44px` and padding switched off explicitly.
 - **`seedSampleDays` only logs meals that have already happened**, so before the first sample
   meal of the morning today would be blank. It backfills one coffee at the current time —
   without that the preview build looks broken at 6am and day counts drift by one.
