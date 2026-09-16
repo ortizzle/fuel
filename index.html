@@ -249,6 +249,8 @@
   .quick-item .qn { font-weight: 600; font-size: 15px; }
   .quick-item .qs { font-size: 12px; color: var(--ink-dim); }
   .quick-item .qk { white-space: nowrap; color: var(--ink-mid); font-variant-numeric: tabular-nums; }
+  .quick-item .qinfo { flex: 1; min-width: 0; min-height: 44px; display: flex; justify-content: space-between; align-items: center; gap: 8px; text-align: left; }
+  .quick-item input.sel { width: 20px; height: 20px; min-height: 0; padding: 0; margin: 0; accent-color: var(--accent); flex: none; }
   .preview-img { width: 100%; max-height: 240px; object-fit: contain; border-radius: var(--radius); background: var(--surface-3); display: block; margin-bottom: 10px; }
   .scan-box { position: relative; width: 100%; aspect-ratio: 4 / 3; max-width: 100%; background: #000; border-radius: var(--radius); overflow: hidden; margin-bottom: 10px; }
   .scan-box video { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -2124,6 +2126,30 @@ function renderRecentTab(pane, switchTab) {
     picked.scrollIntoView({ block: 'nearest' });
   };
 
+  // Check off several recent foods and add them together, each at the portion it was last
+  // logged. A key in this map rather than a re-lookup, so narrowing the search never drops
+  // a pick that scrolls out of the filtered list.
+  const selected = new Map();
+  let batchMeal = guessMeal();
+  const mealSel = mealSelect(batchMeal);
+  mealSel.addEventListener('change', () => { batchMeal = mealSel.value; });
+  const batchField = el('div', { class: 'field', style: 'margin-top:10px' }, el('label', { text: 'Meal' }), mealSel);
+  const addBtn = el('button', { class: 'btn primary', type: 'button', disabled: true, text: 'Nothing selected' });
+  const refreshBatch = () => {
+    const n = selected.size;
+    addBtn.disabled = !n;
+    addBtn.textContent = n ? 'Add ' + n + (n === 1 ? ' item' : ' items') + ' · ' + fmtK(Array.from(selected.values()).reduce((t, f) => t + f.per.kcal * f.servings, 0)) + ' kcal' : 'Nothing selected';
+  };
+  addBtn.addEventListener('click', () => {
+    const items = Array.from(selected.values());
+    for (const f of items) addEntry({ name: f.name, brand: f.brand, source: f.source || 'quick', barcode: f.barcode || null,
+      servings: f.servings, meal: batchMeal, context: f.context, serving: f.serving, per: f.per });
+    render();
+    toast('Added ' + items.length + (items.length === 1 ? ' item' : ' items'));
+    closeSheet();
+  });
+  const hasAnyRecent = recentFoods(1).length > 0;
+
   const draw = () => {
     clear(body);
     const q = search.value.trim().toLowerCase();
@@ -2156,13 +2182,21 @@ function renderRecentTab(pane, switchTab) {
         el('p', { text: q ? 'Try the Quick tab, or scan it.' : 'Anything you log shows up here, so the second time is one tap.' })));
     } else {
       const list = el('div', { class: 'quick-list' });
-      for (const f of foods) list.appendChild(el('button', { class: 'quick-item', type: 'button', onclick: () => openFood(f) },
-        el('div', {},
-          el('div', { class: 'qn', text: f.name }),
-          el('div', { class: 'qs', text: (f.brand ? f.brand + ' · ' : '') + fmtServ(f.servings) + ' × ' + f.serving.label + (f.count > 1 ? '  ·  ' + f.count + '×' : '') })),
-        el('div', { class: 'qk', text: fmtK(f.per.kcal * f.servings) + ' kcal' })));
+      for (const f of foods) {
+        const cb = el('input', { type: 'checkbox', class: 'sel', 'aria-label': 'Select ' + f.name, checked: selected.has(f.key) ? true : null });
+        cb.addEventListener('change', () => { if (cb.checked) selected.set(f.key, f); else selected.delete(f.key); refreshBatch(); });
+        const info = el('button', { type: 'button', class: 'qinfo', onclick: () => openFood(f) },
+          el('div', {},
+            el('div', { class: 'qn', text: f.name }),
+            el('div', { class: 'qs', text: (f.brand ? f.brand + ' · ' : '') + fmtServ(f.servings) + ' × ' + f.serving.label + (f.count > 1 ? '  ·  ' + f.count + '×' : '') })),
+          el('div', { class: 'qk', text: fmtK(f.per.kcal * f.servings) + ' kcal' }));
+        list.appendChild(el('div', { class: 'quick-item' }, cb, info));
+      }
       body.appendChild(list);
     }
+    // The row itself still opens straight to the single-item card for a precise one-off
+    // adjustment; the checkbox is the other path, for adding several together unadjusted.
+    if (hasAnyRecent) body.append(batchField, addBtn);
 
     // Creating a saved meal lives here, beside where you would use one.
     const today = entriesFor(state.date);

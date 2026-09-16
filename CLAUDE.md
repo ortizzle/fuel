@@ -90,6 +90,16 @@ letters always sit beside the numbers so identity never depends on colour alone.
   plus brand when there is none. Saved meals are a second record type, `savedmeal`, so they
   inherit backup, restore-merge and tombstones. Everything that reads the log filters on
   `type === 'entry'`, so new record types are additive.
+- **The Recent tab has two independent tap targets per row, not one.** A checkbox selects into a
+  batch; tapping the row's own text (the `.qinfo` button) still opens the single-item adjust card
+  unchanged, exactly like a saved-meal row's button-plus-icon-button split. `selected` is a
+  `Map<key, food>` declared once outside `draw()`, so it survives every redraw from typing in
+  search — a checked row that scrolls out of a filter still counts toward the batch — and the
+  commit uses each item's own last-used `servings`/`serving`/`per`/`context` untouched, under one
+  shared Meal picker (`batchMeal`, default `guessMeal()`) for the whole batch. Recent items carry
+  no stored `meal` of their own, hence the shared picker; they do carry their own `context`, hence
+  no shared one for that. Checkboxes default unchecked — this is not the photo/description
+  estimate flow's opt-out-what's-wrong pattern, it is opt-in on a list that can hold 40 rows.
 - **Editing an entry re-remembers the product** behind its barcode, otherwise the next scan
   hands back the numbers you just corrected.
 - **Restore merges, never overwrites.** Newest `updatedAt` wins and tombstones are
