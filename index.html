@@ -626,14 +626,26 @@ function recentFoods(limit) {
     if (!e || e.type !== 'entry' || e.deleted) continue;
     const k = foodKey(e), at = e.createdAt || 0, seen = byKey.get(k);
     if (!seen) byKey.set(k, { key: k, name: e.name, brand: e.brand, barcode: e.barcode || null, source: e.source,
-      serving: e.serving, per: e.per, servings: e.servings, context: e.context, lastAt: at, count: 1, per100: null, image: null });
+      serving: e.serving, per: e.per, servings: e.servings, context: e.context, lastAt: at, count: 1, per100: null, image: null,
+      meals: { [e.meal]: { count: 1, lastAt: at } } });
     else {
       seen.count++;
+      const mm = seen.meals[e.meal] || (seen.meals[e.meal] = { count: 0, lastAt: 0 });
+      mm.count++; if (at > mm.lastAt) mm.lastAt = at;
       if (at > seen.lastAt) Object.assign(seen, { name: e.name, brand: e.brand, serving: e.serving, per: e.per,
         servings: e.servings, context: e.context, source: e.source, lastAt: at });
     }
   }
-  return Array.from(byKey.values()).sort((a, b) => b.lastAt - a.lastAt).slice(0, limit || 40);
+  // The meal each food is logged under most often — not the last meal it happened to be
+  // eaten at, so a one-off exception cannot relabel it. Ties go to whichever happened most
+  // recently, since that is the closer read on what the food is being used as now.
+  const foods = Array.from(byKey.values());
+  for (const f of foods) {
+    let top = null, topCount = -1, topAt = -1;
+    for (const [m, v] of Object.entries(f.meals)) { if (v.count > topCount || (v.count === topCount && v.lastAt > topAt)) { top = m; topCount = v.count; topAt = v.lastAt; } }
+    f.topMeal = top;
+  }
+  return foods.sort((a, b) => b.lastAt - a.lastAt).slice(0, limit || 40);
 }
 function savedMeals() {
   return Object.values(state.data.records).filter(r => r && r.type === 'savedmeal' && !r.deleted)
@@ -2154,7 +2166,11 @@ function renderRecentTab(pane, switchTab) {
     clear(body);
     const q = search.value.trim().toLowerCase();
     const meals = savedMeals().filter(m => !q || m.name.toLowerCase().includes(q));
-    const foods = recentFoods(40).filter(f => !q || (f.name + ' ' + (f.brand || '')).toLowerCase().includes(q));
+    // Same recency order within each group; foods usually eaten at this time of day just move
+    // up as a group, so what is actually right now is not buried under whatever was logged last.
+    const currentMeal = guessMeal();
+    const foods = recentFoods(40).filter(f => !q || (f.name + ' ' + (f.brand || '')).toLowerCase().includes(q))
+      .sort((a, b) => (a.topMeal === currentMeal ? 0 : 1) - (b.topMeal === currentMeal ? 0 : 1));
 
     if (meals.length) {
       body.appendChild(el('div', { class: 'note', style: 'margin:4px 0 6px', text: 'Saved meals' }));

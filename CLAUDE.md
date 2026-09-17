@@ -100,6 +100,14 @@ letters always sit beside the numbers so identity never depends on colour alone.
   no stored `meal` of their own, hence the shared picker; they do carry their own `context`, hence
   no shared one for that. Checkboxes default unchecked — this is not the photo/description
   estimate flow's opt-out-what's-wrong pattern, it is opt-in on a list that can hold 40 rows.
+- **Recent foods are reordered by daypart, never re-fetched or re-limited for it.**
+  `recentFoods()` folds a per-food meal histogram (`meals: {mealKey: {count, lastAt}}`) into
+  `topMeal` — the meal a food is logged under *most often*, ties broken by whichever happened more
+  recently — and still returns its usual 40-by-recency. The Recent tab's `draw()` does the actual
+  boost: a stable `.sort()` keyed only on `topMeal === guessMeal()` pulls today's daypart to the
+  front as a group, recency order intact within both groups, because `Array.prototype.sort` is
+  spec-stable. Do this reorder in `draw()`, not inside `recentFoods()` itself — other callers
+  (`openAddSheet`'s existence check) want plain recency, not a time-of-day opinion.
 - **Editing an entry re-remembers the product** behind its barcode, otherwise the next scan
   hands back the numbers you just corrected.
 - **Restore merges, never overwrites.** Newest `updatedAt` wins and tombstones are
