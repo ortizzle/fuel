@@ -202,7 +202,7 @@
   .note { font-size: 13px; color: var(--ink-dim); margin: 8px 0; }
   .stepper { display: inline-flex; align-items: center; border: 1px solid var(--line-strong); border-radius: 12px; overflow: hidden; background: var(--surface-2); }
   .stepper button { width: 44px; height: 44px; font-size: 22px; color: var(--ink); }
-  .stepper .sv { min-width: 56px; text-align: center; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .stepper .sv { width: 60px; text-align: center; font-weight: 700; font-variant-numeric: tabular-nums; border: 0; background: transparent; padding: 0; }
   .status { display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: var(--radius); background: var(--surface-2); font-size: 14px; color: var(--ink-mid); margin: 10px 0; }
   .status.err { color: var(--danger); border: 1px solid var(--danger); background: transparent; }
   .spinner { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--line-strong); border-top-color: var(--accent); animation: spin .8s linear infinite; flex: none; }
@@ -487,17 +487,27 @@ function macroText(per, mult, withFiber) {
   if (withFiber && per.fiber) parts.push(sep(), one('fb', 'Fiber', per.fiber * m));
   return el('div', { class: 'mac' }, parts);
 }
-function stepper({ value, step = 0.5, min = 0.25, max = 50, onChange, format }) {
-  let v = value;
+function stepper({ value, step = 1, reverseStep = 0.25, min = 0.25, max = 50, onChange, format }) {
+  let v = value, lastDir = 0;
   const fmt = format || fmtServ;
-  const display = el('span', { class: 'sv', text: fmt(v) });
+  const display = numInput({ class: 'sv', 'aria-label': 'Servings', value: fmt(v) });
   // Three decimals, because a portion typed in grams rarely lands on a round fraction of a
   // serving: 20.5 g of a 15 g serving is 1.367, and rounding that to 1.37 would read back as 20.6.
-  const set = (nv) => { v = Math.min(max, Math.max(min, Math.round(nv * 1000) / 1000)); display.textContent = fmt(v); onChange(v); return v; };
+  const set = (nv) => { v = Math.min(max, Math.max(min, Math.round(nv * 1000) / 1000)); setNum(display, fmt(v)); onChange(v); return v; };
+  const bump = (dir) => {
+    // Keep pressing the same button and it moves by a whole number; press the other one and
+    // the very next tap is a quarter step — a small correction after an overshoot, not
+    // another full jump past where you meant to land.
+    set(v + dir * (lastDir !== 0 && dir !== lastDir ? reverseStep : step));
+    lastDir = dir;
+  };
+  display.addEventListener('focus', () => display.select());
+  display.addEventListener('change', () => { lastDir = 0; set(numVal(display, v)); });
+  display.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); display.blur(); } });
   const wrap = el('div', { class: 'stepper' },
-    el('button', { type: 'button', 'aria-label': 'Less', text: '−', onclick: () => set(v - step) }),
+    el('button', { type: 'button', 'aria-label': 'Less', text: '−', onclick: () => bump(-1) }),
     display,
-    el('button', { type: 'button', 'aria-label': 'More', text: '+', onclick: () => set(v + step) }));
+    el('button', { type: 'button', 'aria-label': 'More', text: '+', onclick: () => bump(1) }));
   wrap.setValue = set;
   return wrap;
 }
@@ -1071,7 +1081,7 @@ function renderEstimateResults(container, result, { source, onAdded, barcode, wh
     const kcalEl = el('div', { class: 'rk', text: fmtK(it.per.kcal) });
     const macEl = el('div');
     macEl.appendChild(macroText(it.per, 1));
-    const st = stepper({ value: 1, step: 0.5, min: 0.25, onChange: (v) => { it.servings = v; kcalEl.textContent = fmtK(it.per.kcal * v); clear(macEl); macEl.appendChild(macroText(it.per, v)); refreshBtn(); } });
+    const st = stepper({ value: 1, min: 0.25, onChange: (v) => { it.servings = v; kcalEl.textContent = fmtK(it.per.kcal * v); clear(macEl); macEl.appendChild(macroText(it.per, v)); refreshBtn(); } });
     list.appendChild(el('div', { class: 'result-item' }, cb,
       el('div', {},
         el('div', { class: 'rname' }, it.name, el('span', { class: 'conf ' + it.confidence, text: it.confidence })),
@@ -2378,7 +2388,7 @@ function openEditSheet(id) {
     readout.textContent = bits.join('  ·  ');
     if (!syncing) { syncing = true; setNum(eatenIn, g > 0 ? fmtG(g * servings) : ''); syncing = false; }
   };
-  const st = stepper({ value: servings, step: 0.25, min: 0.05, onChange: (v) => { servings = v; refresh(); } });
+  const st = stepper({ value: servings, min: 0.05, onChange: (v) => { servings = v; refresh(); } });
 
   // Nutrition scales with weight, so correcting the gram weight rescales the numbers with it.
   // The base is captured on focus so typing "2" then "8" scales from the original, not from itself.

@@ -86,6 +86,19 @@ letters always sit beside the numbers so identity never depends on colour alone.
   lands on a round fraction of a serving (20.5 g of a 15 g serving is 1.367), and rounding the
   stored value to 1.37 would read back as 20.6 g. Grams are the honest number; the servings
   count is a label.
+- **The stepper's number is a real input now, not a span — tap it to type a value.** `bump(dir)`
+  tracks `lastDir`: a press that continues the direction already in motion is a whole-number
+  `step` (default 1), a press that reverses it is a quarter-step `reverseStep` (default 0.25) —
+  a small correction after an overshoot, not another full jump past where you meant to land.
+  Typing a value directly resets `lastDir` to 0, so the next button press starts fresh at a
+  whole step. `focus` selects all the text so typing overwrites rather than appends; commit is
+  on `change` (fires on blur), matching `kcalIn` in the targets sheet, not `input`+`blur` like
+  the grams fields — there is nothing here that needs to update live as you type. The global
+  `input,select,textarea` rule (padding, `min-height:44px`, `width:100%`, a border) is reset
+  back down for `.stepper .sv` specifically, the same trap `.checks input[type=checkbox]` hit
+  earlier. Every `stepper()` call in the app is a servings/portion field, so this is one shared
+  component, not a per-screen choice — do not give one call site a different `step` without a
+  reason; the four that existed before this were an accidental inconsistency, not a design.
 - **Recents are derived, never stored** — `recentFoods()` folds the log by barcode, or by name
   plus brand when there is none. Saved meals are a second record type, `savedmeal`, so they
   inherit backup, restore-merge and tombstones. Everything that reads the log filters on
