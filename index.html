@@ -487,22 +487,23 @@ function macroText(per, mult, withFiber) {
   if (withFiber && per.fiber) parts.push(sep(), one('fb', 'Fiber', per.fiber * m));
   return el('div', { class: 'mac' }, parts);
 }
-function stepper({ value, step = 1, reverseStep = 0.25, min = 0.25, max = 50, onChange, format }) {
-  let v = value, lastDir = 0;
+function stepper({ value, step = 1, fineStep = 0.25, min = 0.25, max = 50, onChange, format }) {
+  let v = value, pressed = false;
   const fmt = format || fmtServ;
   const display = numInput({ class: 'sv', 'aria-label': 'Servings', value: fmt(v) });
   // Three decimals, because a portion typed in grams rarely lands on a round fraction of a
   // serving: 20.5 g of a 15 g serving is 1.367, and rounding that to 1.37 would read back as 20.6.
   const set = (nv) => { v = Math.min(max, Math.max(min, Math.round(nv * 1000) / 1000)); setNum(display, fmt(v)); onChange(v); return v; };
   const bump = (dir) => {
-    // Keep pressing the same button and it moves by a whole number; press the other one and
-    // the very next tap is a quarter step — a small correction after an overshoot, not
-    // another full jump past where you meant to land.
-    set(v + dir * (lastDir !== 0 && dir !== lastDir ? reverseStep : step));
-    lastDir = dir;
+    // The first press after landing on a value (typed, or a fresh stepper) is a whole number,
+    // to get you in the neighborhood fast. Every press after that is a quarter step, in
+    // either direction — reversing to correct an overshoot is exactly as fine as continuing,
+    // so there is one rule to learn, not a different one depending on which way you last went.
+    set(v + dir * (pressed ? fineStep : step));
+    pressed = true;
   };
   display.addEventListener('focus', () => display.select());
-  display.addEventListener('change', () => { lastDir = 0; set(numVal(display, v)); });
+  display.addEventListener('change', () => { pressed = false; set(numVal(display, v)); });
   display.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); display.blur(); } });
   const wrap = el('div', { class: 'stepper' },
     el('button', { type: 'button', 'aria-label': 'Less', text: '−', onclick: () => bump(-1) }),
