@@ -2,9 +2,9 @@
 // Navigations are network-first so a deploy lands immediately when online, and the last
 // good copy opens when offline. Cross-origin requests (Open Food Facts, USDA, Anthropic,
 // GitHub, fonts, the barcode decoder CDN) are never touched — they always go to the network.
-const VERSION = 'fuel-v1';
+const VERSION = 'fuel-v2';
 const SHELL = [
-  './index.html', './manifest.webmanifest', './icon.svg',
+  './index.html', './ortiz-drive.js', './manifest.webmanifest', './icon.svg',
   './icon-192.png', './icon-512.png', './icon-maskable-512.png', './apple-touch-icon.png'
 ];
 
