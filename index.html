@@ -200,6 +200,8 @@
   .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
   .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
   .note { font-size: 13px; color: var(--ink-dim); margin: 8px 0; }
+  .ortiz-drive .btn, .ortiz-drive-bar.btn { min-height: 48px; }
+  #drive-bar .btn { margin: 0 0 12px; }
   .stepper { display: inline-flex; align-items: center; border: 1px solid var(--line-strong); border-radius: 12px; overflow: hidden; background: var(--surface-2); }
   .stepper button { width: 44px; height: 44px; font-size: 22px; color: var(--ink); }
   .stepper .sv { width: 60px; text-align: center; font-weight: 700; font-variant-numeric: tabular-nums; border: 0; background: transparent; padding: 0; }
@@ -314,6 +316,7 @@
       <button class="date-label" id="date-label" type="button" aria-label="Jump to today"></button>
       <button class="icon-btn" id="date-next" type="button" aria-label="Next day"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></button>
     </div>
+    <div id="drive-bar"></div>
     <section class="card summary" id="summary" aria-live="polite"></section>
     <div id="workout-strip" class="workout-strip hidden"></div>
     <div id="day-ai"></div>
@@ -345,6 +348,7 @@
 </nav>
 <div class="toast" id="toast" role="status"></div>
 
+<script src="ortiz-drive.js"></script>
 <script>
 (function () {
 'use strict';
@@ -563,7 +567,11 @@ state.settings.targets = Object.assign({}, DEFAULT_TARGETS, state.settings.targe
 // only so a walk or a set of weights can get a rough calorie figure.
 state.settings.profile = Object.assign({ equipment: [], open: '', avoid: '', goal: '', weightLb: null, heightIn: null, age: null, sex: 'm', activity: 'sedentary', goalLb: null, goalMode: 'steady', kcalCustom: null }, state.settings.profile || {});
 
-function saveData() { if (!Store.set('data', state.data)) toast('Storage is full — could not save'); }
+let driveTimer = null;
+function saveData() {
+  if (!Store.set('data', state.data)) { toast('Storage is full — could not save'); return; }
+  clearTimeout(driveTimer); driveTimer = setTimeout(() => OrtizDrive.check(), 3000);
+}
 function saveSettings() { Store.set('settings', state.settings); }
 function uid() { return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8); }
 function mealIndex(m) { const i = MEALS.findIndex(x => x[0] === m); return i < 0 ? 99 : i; }
@@ -813,7 +821,7 @@ function profileContext() {
 /* =====================================================================
    4. Rendering — log view
    ===================================================================== */
-function render() { renderHeader(); renderSummary(); renderWorkoutStrip(); renderDayAI(); renderLog(); if (state.view === 'insights') renderInsights(); }
+function render() { renderHeader(); OrtizDrive.mountBar($('drive-bar'), { className: 'btn' }); renderSummary(); renderWorkoutStrip(); renderDayAI(); renderLog(); if (state.view === 'insights') renderInsights(); }
 
 function renderHeader() {
   const lbl = $('date-label'); clear(lbl);
@@ -2466,6 +2474,9 @@ function backupFile() {
   const json = JSON.stringify(backupPayload(), null, 1);
   return new File([json], 'fuel-backup-' + AZ.today() + '.json', { type: 'application/json' });
 }
+// The Drive copy is the backup file minus exportedAt, which changes on every call and
+// would make every check look like new data.
+function driveData() { const b = backupPayload(); delete b.exportedAt; return JSON.parse(JSON.stringify(b)); }
 function markBackedUp() { Store.set('last_backup', Date.now()); }
 function lastBackupText() {
   const t = Store.get('last_backup', 0);
@@ -2609,6 +2620,7 @@ function openSettings() {
     el('div', { class: 'field', style: 'margin-top:16px' }, el('label', { text: 'Backup' }), stats, backupAge,
       el('div', { class: 'btn-row' }, shareBtn, downloadBtn),
       el('button', { class: 'btn ghost', type: 'button', text: 'Restore from a backup file', style: 'margin-top:10px', onclick: () => restoreIn.click() }), restoreIn,
+      OrtizDrive.settingsBlock({ labelTag: 'label', labelClass: 'drive-label', buttonClass: 'btn', hintClass: 'note' }),
       el('div', { class: 'note' }, 'A backup is one JSON file holding your log, targets and remembered barcodes. Saving it puts a copy in Drive, Files or anywhere else you pick.')),
     el('div', { class: 'field', style: 'margin-top:16px' }, el('label', { text: 'Data' }),
       el('div', { class: 'btn-row' },
@@ -2616,7 +2628,7 @@ function openSettings() {
         el('button', { class: 'btn', type: 'button', text: 'Copy JSON', onclick: () => { clear(exportBox); const ta = el('textarea', { readonly: true, 'aria-label': 'Exported data', style: 'min-height:140px;font-family:ui-monospace,monospace;font-size:12px' }); ta.value = JSON.stringify(backupPayload(), null, 1); exportBox.append(ta, el('button', { class: 'btn ghost', type: 'button', text: 'Copy to clipboard', onclick: async () => { try { await navigator.clipboard.writeText(ta.value); toast('Copied'); } catch (e) { ta.select(); toast('Select all and copy'); } } })); } })),
       exportBox,
       el('button', { class: 'btn danger', type: 'button', text: 'Clear all data on this device', style: 'margin-top:10px', onclick: () => showModal({ title: 'Clear everything?', message: 'All logged entries and remembered barcodes on this device will be erased. Keys and targets stay.', confirmText: 'Erase', cancelText: 'Keep', danger: true, onConfirm: () => { state.data = { records: {} }; saveData(); Store.remove('products'); render(); closeSheet(); toast('Cleared'); } }) })),
-    el('div', { class: 'note', style: 'margin-top:18px' }, 'Fuel v0.4 · Move prototype · data lives on this device, so back it up · dates use Arizona time'));
+    el('div', { class: 'note', style: 'margin-top:18px' }, 'Fuel v0.5 · Move prototype · data lives on this device, so back it up · dates use Arizona time'));
 }
 
 /* ---------- Deterministic sample data: two weeks with realistic variety, so Insights has something to say ---------- */
@@ -2915,6 +2927,8 @@ function showView(v) {
   window.scrollTo(0, 0);
 }
 function init() {
+  OrtizDrive.init({ app: 'Fuel', prefix: 'fuel', getData: driveData, toast: (m) => toast(m), allowed: () => !state.preview,
+    onChange: () => OrtizDrive.mountBar($('drive-bar'), { className: 'btn' }) });
   applyScheme(state.settings.scheme);
   try { if (window.matchMedia) window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => applyScheme(state.settings.scheme)); } catch (e) {}
   try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); } catch (e) {}
