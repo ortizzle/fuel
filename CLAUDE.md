@@ -160,6 +160,20 @@ letters always sit beside the numbers so identity never depends on colour alone.
   just going quiet. `howlerKind()` itself was deliberately left alone (`walk_run` still maps to
   `'run'`, MET 9, even though a given entry might really be a walk) — the fix is giving the human
   a box to type the real number in, not guessing harder at one.
+- **`mirrorChart()` is a second, separate chart function, not a mode bolted onto
+  `columnChart()`.** Only the Calories-per-day card uses it, and only on a range with `S.anyOut`
+  — `S.days` carries plain numbers either way, the branch in `renderInsights` just decides which
+  renderer reads them. It draws intake climbing up from a *shared* zero line and burn falling
+  away below it on the *same* px-per-kcal scale — one `niceStep()` ceiling for intake (`topIn`),
+  a second, independent one for burn (`botOut`), but the ratio `plotH / (topIn + botOut)` is the
+  single conversion both halves use. Do not give burn its own independently-fit scale to make
+  small bars look bigger — that would be the same mistake the netted ring was rejected for, just
+  moved into a chart. The down-bar path is the up-bar path with every vertical delta and arc
+  sweep-flag mirrored (`v-(h-r)`→`v(h-r)`, sweep `1`→`0`) — a deliberate, checked transform, not
+  a freehand guess; verify any change to it by reading `getBBox()` heights back in a test, the
+  way `mirror-chart-check.js` does, since a wrong sweep flag still *looks* like a rounded rect at
+  a glance and only shows wrong on the corner you flipped. Lower-half gridlines are labeled with
+  the plain magnitude, never a minus sign — burn is not a negative calorie count.
 - **Energy out is blue (`--move`), energy in is brass, and nothing nets.** `ringSVG(pct, outPct)`
   draws two rings on one scale (the calorie target): intake clockwise from the top, burn
   counter-clockwise from the top, so the gap between the two ends is the deficit. The center and

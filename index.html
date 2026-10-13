@@ -2828,6 +2828,58 @@ function columnChart(container, { items, target, tipText, unit = '', height = 17
   if (target) svg.appendChild(svgEl('line', { x1: padL, x2: width - padR, y1: y(target), y2: y(target), stroke: 'var(--ink-dim)', 'stroke-width': 1, 'stroke-dasharray': '0' }));
   container.appendChild(svg);
 }
+// Intake climbs from a shared zero line, burn falls away below it — the same scale runs both
+// directions, exactly like the day's own ring, so a short blue bar under a tall brass one is
+// an honest small slice of it rather than stretched to look comparable.
+function mirrorChart(container, { items, target, tipText, height = 190 }) {
+  clear(container);
+  const width = Math.max(240, Math.min(560, container.clientWidth || 358));
+  const padL = 36, padR = 8, padT = 10, padB = 22;
+  const plotW = width - padL - padR, plotH = height - padT - padB;
+  const maxIn = Math.max(1, ...items.map(i => i.inVal), target || 0), maxOut = Math.max(0, ...items.map(i => i.outVal));
+  const step = niceStep(maxIn);
+  const topIn = Math.max(step, Math.ceil((maxIn * 1.05) / step) * step);
+  const botOut = maxOut > 0 ? Math.max(step, Math.ceil((maxOut * 1.2) / step) * step) : 0;
+  const units = topIn + botOut;
+  const upperH = plotH * topIn / units, lowerH = plotH - upperH, zeroY = padT + upperH;
+  const yUp = (v) => zeroY - (v / topIn) * upperH;
+  const yDown = (v) => zeroY + (botOut > 0 ? (v / botOut) * lowerH : 0);
+  const svg = svgEl('svg', { viewBox: '0 0 ' + width + ' ' + height, width, height, role: 'img' });
+  for (let v = 0; v <= topIn + 0.001; v += step) {
+    svg.appendChild(svgEl('line', { x1: padL, x2: width - padR, y1: yUp(v), y2: yUp(v), stroke: v === 0 ? 'var(--axis)' : 'var(--grid)', 'stroke-width': 1 }));
+    const t = svgEl('text', { x: padL - 6, y: yUp(v) + 4, 'text-anchor': 'end' }); t.textContent = fmtK(v); svg.appendChild(t);
+  }
+  for (let v = step; botOut > 0 && v <= botOut + 0.001; v += step) {
+    svg.appendChild(svgEl('line', { x1: padL, x2: width - padR, y1: yDown(v), y2: yDown(v), stroke: 'var(--grid)', 'stroke-width': 1 }));
+    const t = svgEl('text', { x: padL - 6, y: yDown(v) + 4, 'text-anchor': 'end' }); t.textContent = fmtK(v); svg.appendChild(t);
+  }
+  const slot = plotW / items.length; const bw = Math.min(24, Math.max(3, slot - 2));
+  const tip = el('div', { class: 'tip hidden' }); container.appendChild(tip);
+  items.forEach((it, i) => {
+    const x = padL + slot * i + (slot - bw) / 2;
+    // Rounded top corners growing up from zero, rounded bottom corners growing down from it —
+    // the down bar is the up bar's path with every vertical step and arc sweep mirrored.
+    const hUp = Math.max(0, zeroY - yUp(it.inVal));
+    if (hUp > 0) {
+      const r = Math.min(4, bw / 2, hUp);
+      svg.appendChild(svgEl('path', { d: 'M' + x + ',' + zeroY + ' v' + (-(hUp - r)) + ' a' + r + ',' + r + ' 0 0 1 ' + r + ',' + (-r) + ' h' + (bw - 2 * r) + ' a' + r + ',' + r + ' 0 0 1 ' + r + ',' + r + ' v' + (hUp - r) + ' z', fill: it.over ? 'var(--danger)' : 'var(--bar)' }));
+    }
+    const hDown = Math.max(0, yDown(it.outVal) - zeroY);
+    if (hDown > 0) {
+      const r = Math.min(4, bw / 2, hDown);
+      svg.appendChild(svgEl('path', { d: 'M' + x + ',' + zeroY + ' v' + (hDown - r) + ' a' + r + ',' + r + ' 0 0 0 ' + r + ',' + r + ' h' + (bw - 2 * r) + ' a' + r + ',' + r + ' 0 0 0 ' + r + ',' + (-r) + ' v' + (-(hDown - r)) + ' z', fill: 'var(--move)' }));
+    }
+    if (it.label) { const t = svgEl('text', { x: x + bw / 2, y: height - 6, 'text-anchor': 'middle' }); t.textContent = it.label; svg.appendChild(t); }
+    const hit = svgEl('rect', { class: 'hit', x: padL + slot * i, y: padT, width: slot, height: plotH, tabindex: '0' });
+    const show = () => { tip.textContent = tipText(it); tip.classList.remove('hidden'); tip.style.left = ((x + bw / 2) / width * 100) + '%'; tip.style.top = Math.max(0, yUp(it.inVal) - 6) + 'px'; };
+    const hide = () => tip.classList.add('hidden');
+    hit.addEventListener('pointerenter', show); hit.addEventListener('pointerleave', hide);
+    hit.addEventListener('focus', show); hit.addEventListener('blur', hide); hit.addEventListener('click', show);
+    svg.appendChild(hit);
+  });
+  if (target) svg.appendChild(svgEl('line', { x1: padL, x2: width - padR, y1: yUp(target), y2: yUp(target), stroke: 'var(--ink-dim)', 'stroke-width': 1 }));
+  container.appendChild(svg);
+}
 function rowBars(container, rows) {
   clear(container);
   const m = Math.max(1, ...rows.map(r => r.v));
@@ -2869,7 +2921,13 @@ function renderInsights() {
   if (S.anyOut) c1.appendChild(el('div', { class: 'note', text: 'Movement burned about ' + fmtK(S.avgOut) + ' kcal a day on average; net of it, intake averages ' + fmtK(S.avgNet) + '.' }));
   if (S.weekday && S.weekend) c1.appendChild(el('div', { class: 'note', text: 'Weekdays average ' + fmtK(S.weekday) + ' kcal, weekends ' + fmtK(S.weekend) + '.' }));
   box.appendChild(c1);
-  columnChart(chart1, { items: S.days.map(d => ({ label: xLabel(d.date, range), value: d.totals.kcal, over: d.totals.kcal > S.targets.kcal * 1.1, d })), target: S.targets.kcal, tipText: (it) => AZ.pretty(it.d.date) + ' · ' + fmtK(it.d.totals.kcal) + ' kcal' + (it.d.out ? ' · ' + (it.d.mv.estimated ? '~' : '') + fmtK(it.d.out) + ' out · net ' + fmtK(it.d.net) : '') + ' · P ' + fmtG(it.d.totals.protein) + ' · C ' + fmtG(it.d.totals.carbs) + ' · F ' + fmtG(it.d.totals.fat) });
+  // A range with any movement in it gets the mirrored chart — intake up, burn down, one scale
+  // — so the shape of the week shows without a tap; a range with none is a plain bar chart,
+  // nothing to mirror against.
+  const chartItems = S.days.map(d => ({ label: xLabel(d.date, range), inVal: d.totals.kcal, outVal: d.out, over: d.totals.kcal > S.targets.kcal * 1.1, d }));
+  const chartTip = (it) => AZ.pretty(it.d.date) + ' · ' + fmtK(it.d.totals.kcal) + ' in' + (it.d.out ? ' · ' + (it.d.mv.estimated ? '~' : '') + fmtK(it.d.out) + ' out · net ' + fmtK(it.d.net) : '') + ' · P ' + fmtG(it.d.totals.protein) + ' · C ' + fmtG(it.d.totals.carbs) + ' · F ' + fmtG(it.d.totals.fat);
+  if (S.anyOut) mirrorChart(chart1, { items: chartItems, target: S.targets.kcal, tipText: chartTip });
+  else columnChart(chart1, { items: chartItems.map(it => Object.assign({}, it, { value: it.inVal })), target: S.targets.kcal, tipText: chartTip });
   // Macros
   const c2 = el('section', { class: 'card' }, el('h3', { text: 'Macros' }), el('div', { class: 'sub', text: 'Daily averages against targets' }));
   const macros = el('div', { class: 'macros', style: 'margin-top:12px' });
