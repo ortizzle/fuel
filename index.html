@@ -808,8 +808,11 @@ function dayMovement(date) {
   if (hs.length) {
     // Howlers items carry no kcal of their own, so workoutKcal() always falls through to the
     // same weight-based MET estimate a native workout of the same kind and minutes would get —
-    // it was never missing data, just never asked for here.
-    const items = hs.map(h => ({ kind: howlerKind(h.type), title: h.label, minutes: h.minutes, miles: h.miles }));
+    // it was never missing data, just never asked for here. The id matches what
+    // importFromHowlers() would generate for the same entry, so tapping one into existence
+    // here and bulk-importing later can never double up.
+    const items = hs.map((h, i) => ({ id: 'wk_howl_' + date + '_' + h.type + '_' + i, date, source: 'howlers',
+      kind: howlerKind(h.type), title: h.label, minutes: h.minutes, miles: h.miles }));
     const sum = sumWorkouts(items);
     return { n: hs.length, minutes: sum.minutes, kcal: sum.kcal, estimated: sum.estimated, kinds: Array.from(new Set(items.map(it => it.kind))), source: 'howlers', items };
   }
@@ -949,13 +952,16 @@ function renderWorkoutStrip() {
 }
 function workoutCard(w) {
   const k = workoutKcal(w);
+  // A card whose id has not actually been saved is a live Howlers item shown as a card for
+  // the first time — tapping it opens the sheet pre-filled rather than editing nothing.
+  const saved = !!state.data.records[w.id];
   // With a calorie figure the minutes join the detail line; without one they take the big slot.
-  const bits = [k && w.minutes ? w.minutes + ' min' : null, w.miles ? fmtG(w.miles) + ' mi' : null, w.output ? fmtK(w.output) + ' kJ' : null, w.avgHr ? w.avgHr + ' bpm' : null, w.time || null].filter(Boolean);
+  const bits = [k && w.minutes ? w.minutes + ' min' : null, w.miles ? fmtG(w.miles) + ' mi' : null, w.output ? fmtK(w.output) + ' kJ' : null, w.avgHr ? w.avgHr + ' bpm' : null, w.time || null, saved ? null : 'from The Howlers'].filter(Boolean);
   const meta = el('div', { class: 'meta' });
   bits.forEach((b, i) => { meta.append(el('span', { text: b + (i < bits.length - 1 ? ' ·' : '') })); if (i < bits.length - 1) meta.append(' '); });
   const right = k ? [el('div', { class: 'out', text: (k.estimated ? '~' : '') + fmtK(k.kcal) }), el('div', { class: 'outl', text: 'kcal out' })]
                   : [el('div', { class: 'out', text: String(w.minutes || 0) }), el('div', { class: 'outl', text: 'min' })];
-  return el('button', { class: 'wk', type: 'button', 'aria-label': 'Edit ' + workoutName(w), onclick: () => openMoveSheet(w.id) },
+  return el('button', { class: 'wk', type: 'button', 'aria-label': (saved ? 'Edit ' : 'Edit — from The Howlers — ') + workoutName(w), onclick: () => openMoveSheet(w.id, saved ? null : w) },
     el('div', { class: 'ico' }, svgIcon(ICON[KIND_ICON[w.kind]] || ICON.spark, 20)),
     el('div', {}, el('div', { class: 'name', text: workoutName(w) }), meta),
     el('div', {}, right));
@@ -963,7 +969,9 @@ function workoutCard(w) {
 function renderLog() {
   const log = $('log'); clear(log);
   const entries = entriesFor(state.date), workouts = workoutsFor(state.date);
-  if (!entries.length && !workouts.length) {
+  const mv = dayMovement(state.date);
+  const howlersItems = mv.source === 'howlers' ? mv.items : [];
+  if (!entries.length && !workouts.length && !howlersItems.length) {
     log.appendChild(el('div', { class: 'empty' },
       el('h3', { text: state.date === AZ.today() ? 'Nothing logged yet' : 'Nothing this day' }),
       el('p', { text: 'Scan a barcode, snap a photo of your plate or a label, add food by hand — or log a ride, a walk or a set of weights.' })));
@@ -973,8 +981,11 @@ function renderLog() {
   // 05:40 pre-workout gel above that. Meals group under their heading; workouts stand alone.
   const groups = MEALS.map(([mealKey, mealName]) => ({ mealKey, mealName, group: entries.filter(e => e.meal === mealKey) })).filter(g => g.group.length)
     .map(g => Object.assign(g, { first: g.group.reduce((m, e) => (e.time && e.time < m ? e.time : m), '99:99') }));
+  // Howlers carries no clock time, only the day — its items sort last, same as a native
+  // workout logged with no time of its own.
   const timeline = groups.map(g => ({ at: g.first, order: mealIndex(g.mealKey), meal: g }))
     .concat(workouts.map(w => ({ at: w.time || '99:99', order: 50, workout: w })))
+    .concat(howlersItems.map(w => ({ at: '99:99', order: 50, workout: w })))
     .sort((a, b) => a.at.localeCompare(b.at) || a.order - b.order);
   for (const slot of timeline) {
     if (slot.workout) { log.appendChild(workoutCard(slot.workout)); continue; }
@@ -1526,19 +1537,25 @@ function listOf(v) { return Array.isArray(v) ? v.filter(x => x).map(x => String(
 /* =====================================================================
    7a. Move — logging energy out
    ===================================================================== */
-function openMoveSheet(id) {
+function openMoveSheet(id, prefill) {
   const w = id ? state.data.records[id] : null;
-  if (id && (!w || w.deleted)) return;
-  const s = openSheet({ title: w ? 'Edit workout' : 'Log movement', sub: w ? whenLabel(w) : 'A ride, a walk, weights — whatever it was' });
-  let kind = w ? w.kind : ((profile().equipment || []).includes('peloton') ? 'ride' : 'walk');
+  if (id && !prefill && (!w || w.deleted)) return;
+  // A prefill is a live Howlers item that has never been saved — editing it the first time
+  // is how it becomes a real record, at the id dayMovement() already gave it.
+  const pf = !w ? prefill : null;
+  const s = openSheet({ title: (w || pf) ? 'Edit workout' : 'Log movement',
+    sub: w ? whenLabel(w) : pf ? 'From The Howlers — correct anything that is off, or leave it as is.' : 'A ride, a walk, weights — whatever it was' });
+  let kind = w ? w.kind : pf ? pf.kind : ((profile().equipment || []).includes('peloton') ? 'ride' : 'walk');
   const PH = { ride: 'Peloton ride · e.g. 30 min Power Zone', walk: 'Neighborhood loop', strength: 'Upper body · dumbbells', mobility: 'Stretch after the ride', run: 'Easy run', other: 'What was it?' };
   const grid = el('div', { class: 'kind-grid' }), kindBtns = {};
-  const titleIn = el('input', { type: 'text', value: w ? w.title : '', 'aria-label': 'Title', autocomplete: 'off' });
-  const minIn = numInput({ value: w && w.minutes ? String(w.minutes) : '', 'aria-label': 'Minutes', inputmode: 'numeric', placeholder: '30' });
-  const milesIn = numInput({ value: w && w.miles ? fmtG(w.miles) : '', 'aria-label': 'Miles', placeholder: 'optional' });
+  const titleIn = el('input', { type: 'text', value: w ? w.title : pf ? pf.title : '', 'aria-label': 'Title', autocomplete: 'off' });
+  const minIn = numInput({ value: w && w.minutes ? String(w.minutes) : pf && pf.minutes ? String(pf.minutes) : '', 'aria-label': 'Minutes', inputmode: 'numeric', placeholder: '30' });
+  const milesIn = numInput({ value: w && w.miles ? fmtG(w.miles) : pf && pf.miles ? fmtG(pf.miles) : '', 'aria-label': 'Miles', placeholder: 'optional' });
   const outIn = numInput({ value: w && w.output ? String(w.output) : '', 'aria-label': 'Output kJ', inputmode: 'numeric', placeholder: 'optional' });
+  // Howlers never carries its own calorie figure, so this stays blank on purpose — the estimate
+  // below still shows, and typing a real number (from a watch, say) is exactly the point.
   const kcalIn = numInput({ value: w && w.kcal ? String(w.kcal) : '', 'aria-label': 'Calories', inputmode: 'numeric', placeholder: 'optional' });
-  const dateIn = el('input', { type: 'date', value: w ? w.date : state.date, 'aria-label': 'Date' });
+  const dateIn = el('input', { type: 'date', value: w ? w.date : pf ? pf.date : state.date, 'aria-label': 'Date' });
   const timeIn = el('input', { type: 'time', value: w ? w.time : (state.date === AZ.today() ? AZ.timeHM() : '07:00'), 'aria-label': 'Time' });
   const noteIn = el('textarea', { class: 'plain', placeholder: 'Sets and reps, how it felt, anything for later', 'aria-label': 'Note' }); noteIn.value = w ? w.note : '';
   const est = el('div', { class: 'note' });
@@ -1551,7 +1568,7 @@ function openMoveSheet(id) {
     outField.classList.toggle('hidden', kind !== 'ride');
     const k = workoutKcal({ kind, minutes: numVal(minIn, 0), kcal: numVal(kcalIn, 0) });
     est.textContent = numVal(kcalIn, 0) > 0 ? 'Using the calories you entered.'
-      : k ? '≈ ' + fmtK(k.kcal) + ' kcal out — a rough figure from ' + KIND_MET[kind] + ' METs at ' + Math.round(profile().weightLb) + ' lb. Enter the bike\'s number to override.'
+      : k ? '≈ ' + fmtK(k.kcal) + ' kcal out — a rough figure from ' + KIND_MET[kind] + ' METs at ' + Math.round(profile().weightLb) + ' lb. Enter a real number (a watch, say) to override.'
       : Number(profile().weightLb) > 0 ? 'Enter minutes for a rough calorie estimate.' : 'Enter the calories the bike reports, or add your weight in Settings for a rough estimate.';
   };
   for (const [k, l] of KINDS) {
@@ -1561,15 +1578,29 @@ function openMoveSheet(id) {
   }
   [minIn, kcalIn].forEach(i => i.addEventListener('input', refresh));
   refresh();
-  const save = el('button', { class: 'btn primary', type: 'button', text: w ? 'Save' : 'Add to log', onclick: () => {
+  const save = el('button', { class: 'btn primary', type: 'button', text: (w || pf) ? 'Save' : 'Add to log', onclick: () => {
     const minutes = numVal(minIn, 0);
     if (!(minutes > 0)) { toast('How many minutes?'); minIn.focus(); return; }
     const date = /^\d{4}-\d{2}-\d{2}$/.test(dateIn.value) ? dateIn.value : state.date;
     const time = /^\d{2}:\d{2}/.test(timeIn.value) ? timeIn.value.slice(0, 5) : AZ.timeHM();
     const fields = { kind, title: titleIn.value.trim(), minutes: Math.round(minutes), miles: numVal(milesIn, 0) || null, output: numVal(outIn, 0) || null, kcal: numVal(kcalIn, 0) || null, note: noteIn.value.trim(), date, time };
-    if (w) updateWorkout(w.id, fields); else addWorkout(fields);
+    if (w) updateWorkout(w.id, fields);
+    else if (pf) {
+      addWorkout(Object.assign({ id: pf.id, source: 'howlers' }, fields), true);
+      // The day's other Howlers items would otherwise vanish the moment this one goes native —
+      // native beats Howlers for the whole day, never a mix of the two. Bring the rest along
+      // untouched, at the same ids importFromHowlers() would give them, so a later bulk import
+      // can't duplicate them and nothing on this day is silently lost.
+      (Howlers.forDate(date) || []).forEach((h, i) => {
+        const sid = 'wk_howl_' + date + '_' + h.type + '_' + i;
+        if (sid !== pf.id && !state.data.records[sid] && (h.minutes > 0 || h.miles > 0)) {
+          addWorkout({ id: sid, date, time: '07:00', kind: howlerKind(h.type), title: h.label, minutes: h.minutes || 0, miles: h.miles || null, source: 'howlers' }, true);
+        }
+      });
+      saveData();
+    } else addWorkout(fields);
     if (date !== state.date) state.date = date;
-    render(); closeSheet(); toast(w ? 'Saved' : 'Logged ' + Math.round(minutes) + ' min');
+    render(); closeSheet(); toast((w || pf) ? 'Saved' : 'Logged ' + Math.round(minutes) + ' min');
   } });
   const del = w ? el('button', { class: 'btn danger', type: 'button', text: 'Delete', onclick: () => showModal({ title: 'Delete workout?', message: workoutName(w) + ' will be removed from ' + AZ.pretty(w.date) + '.', confirmText: 'Delete', cancelText: 'Keep', danger: true, onConfirm: () => { deleteWorkout(w.id); render(); toast('Deleted'); closeSheet(); } }) }) : null;
   addKids(s.body,

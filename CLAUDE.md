@@ -147,6 +147,19 @@ letters always sit beside the numbers so identity never depends on colour alone.
   `{kind, minutes, ...}` first (no `kcal` of their own), so `workoutKcal()` runs identically for
   both sources and a Howlers day gets the same weight-based MET estimate a native workout of that
   kind and length would. No weight on file still means no invented number, same as native.
+- **A Howlers item becomes editable by becoming native, not by Howlers becoming writable.**
+  `dayMovement()`'s Howlers items now carry `id: 'wk_howl_' + date + '_' + h.type + '_' + i` —
+  the exact id `importFromHowlers()` would give the same entry — plus `date` and
+  `source:'howlers'`, so `workoutCard(w)` can tell a live-but-unsaved item from a real record
+  with one check, `!!state.data.records[w.id]`, no new field needed. Tapping an unsaved one calls
+  `openMoveSheet(w.id, w)` — the second argument is `prefill`, used only when `id` doesn't resolve
+  to a record — which seeds the form but writes nothing until Save. On Save, every *other* Howlers
+  item for that date is silently promoted alongside the edited one, at their own matching ids,
+  before the one `saveData()` — native beats Howlers for the whole day once any record exists, so
+  promoting only the tapped item would make its untouched siblings vanish from the day instead of
+  just going quiet. `howlerKind()` itself was deliberately left alone (`walk_run` still maps to
+  `'run'`, MET 9, even though a given entry might really be a walk) — the fix is giving the human
+  a box to type the real number in, not guessing harder at one.
 - **Energy out is blue (`--move`), energy in is brass, and nothing nets.** `ringSVG(pct, outPct)`
   draws two rings on one scale (the calorie target): intake clockwise from the top, burn
   counter-clockwise from the top, so the gap between the two ends is the deficit. The center and
