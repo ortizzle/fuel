@@ -142,7 +142,11 @@ letters always sit beside the numbers so identity never depends on colour alone.
   tombstones without any extra code. `dayMovement(date)` is the one place that decides what a day's
   movement is: native records if there are any, else The Howlers' read-only cache — never both, so
   importing Howlers history cannot double-count. Everything that reads the log still filters on
-  `type === 'entry'`, so entries and workouts never leak into each other's totals.
+  `type === 'entry'`, so entries and workouts never leak into each other's totals. Both branches
+  share `sumWorkouts(items)` for the minutes/kcal/estimated rollup — Howlers items are mapped to
+  `{kind, minutes, ...}` first (no `kcal` of their own), so `workoutKcal()` runs identically for
+  both sources and a Howlers day gets the same weight-based MET estimate a native workout of that
+  kind and length would. No weight on file still means no invented number, same as native.
 - **Energy out is blue (`--move`), energy in is brass, and nothing nets.** `ringSVG(pct, outPct)`
   draws two rings on one scale (the calorie target): intake clockwise from the top, burn
   counter-clockwise from the top, so the gap between the two ends is the deficit. The center and

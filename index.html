@@ -790,16 +790,29 @@ function workoutKcal(w) {
   return { kcal: Math.round((KIND_MET[w.kind] || 4) * (lb * 0.4536) * (w.minutes / 60)), estimated: true };
 }
 function howlerKind(type) { return Howlers.RUN_TYPES.includes(type) ? 'run' : type === 'peloton' ? 'ride' : type === 'strength' ? 'strength' : type === 'mobility' ? 'mobility' : 'other'; }
+// Minutes and an optional calorie figure for a list of workout-shaped items — native Fuel
+// records or Howlers items mapped into the same {kind, minutes} shape both lean on. Pulled out
+// so the two sources in dayMovement() can't drift: fix the math once, both paths get it.
+function sumWorkouts(items) {
+  let minutes = 0, kcal = 0, estimated = false;
+  for (const w of items) { minutes += w.minutes || 0; const k = workoutKcal(w); if (k) { kcal += k.kcal; estimated = estimated || k.estimated; } }
+  return { minutes, kcal, estimated };
+}
 function dayMovement(date) {
   const ws = workoutsFor(date);
   if (ws.length) {
-    let minutes = 0, kcal = 0, estimated = false;
-    for (const w of ws) { minutes += w.minutes || 0; const k = workoutKcal(w); if (k) { kcal += k.kcal; estimated = estimated || k.estimated; } }
-    return { n: ws.length, minutes, kcal, estimated, kinds: Array.from(new Set(ws.map(w => w.kind))), source: 'fuel', items: ws };
+    const sum = sumWorkouts(ws);
+    return { n: ws.length, minutes: sum.minutes, kcal: sum.kcal, estimated: sum.estimated, kinds: Array.from(new Set(ws.map(w => w.kind))), source: 'fuel', items: ws };
   }
   const hs = Howlers.connected() && Howlers.cache() ? Howlers.forDate(date) : [];
-  if (hs.length) return { n: hs.length, minutes: hs.reduce((s, h) => s + (h.minutes || 0), 0), kcal: 0, estimated: false, kinds: Array.from(new Set(hs.map(h => howlerKind(h.type)))), source: 'howlers',
-    items: hs.map(h => ({ kind: howlerKind(h.type), title: h.label, minutes: h.minutes, miles: h.miles })) };
+  if (hs.length) {
+    // Howlers items carry no kcal of their own, so workoutKcal() always falls through to the
+    // same weight-based MET estimate a native workout of the same kind and minutes would get —
+    // it was never missing data, just never asked for here.
+    const items = hs.map(h => ({ kind: howlerKind(h.type), title: h.label, minutes: h.minutes, miles: h.miles }));
+    const sum = sumWorkouts(items);
+    return { n: hs.length, minutes: sum.minutes, kcal: sum.kcal, estimated: sum.estimated, kinds: Array.from(new Set(items.map(it => it.kind))), source: 'howlers', items };
+  }
   return { n: 0, minutes: 0, kcal: 0, estimated: false, kinds: [], source: null, items: [] };
 }
 function movementLine(m, withKcal) {
