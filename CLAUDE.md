@@ -173,7 +173,14 @@ letters always sit beside the numbers so identity never depends on colour alone.
   a freehand guess; verify any change to it by reading `getBBox()` heights back in a test, the
   way `mirror-chart-check.js` does, since a wrong sweep flag still *looks* like a rounded rect at
   a glance and only shows wrong on the corner you flipped. Lower-half gridlines are labeled with
-  the plain magnitude, never a minus sign — burn is not a negative calorie count.
+  the plain magnitude, never a minus sign — burn is not a negative calorie count. The down bars fill with
+  `--burn`, a token of its own — not `--move`. `--bar` and `--move` happen to be the exact same
+  hex in both themes (an earlier, unrelated coincidence, not a deliberate pairing), so the first
+  version of this chart put intake and burn side by side in identical colors and the shape alone
+  had to carry the whole distinction. `--burn` is also deliberately not `--ok` — same green
+  family, but `--ok` already means confidence-badge-correct, a different concept that happens to
+  render near this card. Adding a new token beat reusing one that already meant something else,
+  which is exactly how `--bar`/`--move` collided in the first place.
 - **Energy out is blue (`--move`), energy in is brass, and nothing nets.** `ringSVG(pct, outPct)`
   draws two rings on one scale (the calorie target): intake clockwise from the top, burn
   counter-clockwise from the top, so the gap between the two ends is the deficit. The center and

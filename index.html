@@ -26,7 +26,7 @@
     --line: rgba(23,42,69,.10); --line-strong: rgba(23,42,69,.22);
     --btn-bg: #172a45; --btn-ink: #fffcf7;
     --accent: #8a5a2b; --accent-ink: #fffcf7;
-    --track: #e9e2d4; --grid: #e6dfd1; --axis: #cdc4b3; --bar: #5d6f91; --move: #5d6f91;
+    --track: #e9e2d4; --grid: #e6dfd1; --axis: #cdc4b3; --bar: #5d6f91; --move: #5d6f91; --burn: #3f9142;
     --protein: #b8302f; --carbs: #a37a00; --fat: #4257d9; --fiber: #2f8a4e;
     --danger: #c0392b; --ok: #2e8b57; --warn: #b7791f;
     --shadow: 0 1px 2px rgba(23,42,69,.05), 0 6px 20px rgba(23,42,69,.06);
@@ -41,7 +41,7 @@
       --line: rgba(241,233,220,.10); --line-strong: rgba(241,233,220,.22);
       --btn-bg: #d2a06f; --btn-ink: #1c1208;
       --accent: #d2a06f; --accent-ink: #1c1208;
-      --track: #263450; --grid: #24324c; --axis: #37476a; --bar: #8fa3c7; --move: #8fa3c7;
+      --track: #263450; --grid: #24324c; --axis: #37476a; --bar: #8fa3c7; --move: #8fa3c7; --burn: #5cc168;
       --protein: #d9455e; --carbs: #bd8b1f; --fat: #7488ff; --fiber: #3aae6c;
       --danger: #ff6b5f; --ok: #4cc98a; --warn: #f0b73a;
       --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px rgba(0,0,0,.35);
@@ -54,7 +54,7 @@
     --line: rgba(241,233,220,.10); --line-strong: rgba(241,233,220,.22);
     --btn-bg: #d2a06f; --btn-ink: #1c1208;
     --accent: #d2a06f; --accent-ink: #1c1208;
-    --track: #263450; --grid: #24324c; --axis: #37476a; --bar: #8fa3c7; --move: #8fa3c7;
+    --track: #263450; --grid: #24324c; --axis: #37476a; --bar: #8fa3c7; --move: #8fa3c7; --burn: #5cc168;
     --protein: #d9455e; --carbs: #bd8b1f; --fat: #7488ff; --fiber: #3aae6c;
     --danger: #ff6b5f; --ok: #4cc98a; --warn: #f0b73a;
     --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px rgba(0,0,0,.35);
@@ -66,7 +66,7 @@
     --line: rgba(23,42,69,.10); --line-strong: rgba(23,42,69,.22);
     --btn-bg: #172a45; --btn-ink: #fffcf7;
     --accent: #8a5a2b; --accent-ink: #fffcf7;
-    --track: #e9e2d4; --grid: #e6dfd1; --axis: #cdc4b3; --bar: #5d6f91; --move: #5d6f91;
+    --track: #e9e2d4; --grid: #e6dfd1; --axis: #cdc4b3; --bar: #5d6f91; --move: #5d6f91; --burn: #3f9142;
     --protein: #b8302f; --carbs: #a37a00; --fat: #4257d9; --fiber: #2f8a4e;
     --danger: #c0392b; --ok: #2e8b57; --warn: #b7791f;
     --shadow: 0 1px 2px rgba(23,42,69,.05), 0 6px 20px rgba(23,42,69,.06);
@@ -2867,7 +2867,7 @@ function mirrorChart(container, { items, target, tipText, height = 190 }) {
     const hDown = Math.max(0, yDown(it.outVal) - zeroY);
     if (hDown > 0) {
       const r = Math.min(4, bw / 2, hDown);
-      svg.appendChild(svgEl('path', { d: 'M' + x + ',' + zeroY + ' v' + (hDown - r) + ' a' + r + ',' + r + ' 0 0 0 ' + r + ',' + r + ' h' + (bw - 2 * r) + ' a' + r + ',' + r + ' 0 0 0 ' + r + ',' + (-r) + ' v' + (-(hDown - r)) + ' z', fill: 'var(--move)' }));
+      svg.appendChild(svgEl('path', { d: 'M' + x + ',' + zeroY + ' v' + (hDown - r) + ' a' + r + ',' + r + ' 0 0 0 ' + r + ',' + r + ' h' + (bw - 2 * r) + ' a' + r + ',' + r + ' 0 0 0 ' + r + ',' + (-r) + ' v' + (-(hDown - r)) + ' z', fill: 'var(--burn)' }));
     }
     if (it.label) { const t = svgEl('text', { x: x + bw / 2, y: height - 6, 'text-anchor': 'middle' }); t.textContent = it.label; svg.appendChild(t); }
     const hit = svgEl('rect', { class: 'hit', x: padL + slot * i, y: padT, width: slot, height: plotH, tabindex: '0' });
