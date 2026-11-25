@@ -789,7 +789,7 @@ function workoutKcal(w) {
   if (!lb || !w.minutes) return null;
   return { kcal: Math.round((KIND_MET[w.kind] || 4) * (lb * 0.4536) * (w.minutes / 60)), estimated: true };
 }
-function howlerKind(type) { return Howlers.RUN_TYPES.includes(type) ? 'run' : type === 'peloton' ? 'ride' : type === 'strength' ? 'strength' : type === 'mobility' ? 'mobility' : 'other'; }
+function howlerKind(type, h) { if (h && h.kind) return h.kind; return Howlers.RUN_TYPES.includes(type) ? 'run' : type === 'peloton' ? 'ride' : type === 'strength' ? 'strength' : type === 'mobility' ? 'mobility' : 'other'; }
 // Minutes and an optional calorie figure for a list of workout-shaped items — native Fuel
 // records or Howlers items mapped into the same {kind, minutes} shape both lean on. Pulled out
 // so the two sources in dayMovement() can't drift: fix the math once, both paths get it.
@@ -812,7 +812,7 @@ function dayMovement(date) {
     // importFromHowlers() would generate for the same entry, so tapping one into existence
     // here and bulk-importing later can never double up.
     const items = hs.map((h, i) => ({ id: 'wk_howl_' + date + '_' + h.type + '_' + i, date, source: 'howlers',
-      kind: howlerKind(h.type), title: h.label, minutes: h.minutes, miles: h.miles }));
+      kind: howlerKind(h.type, h), title: h.label, minutes: h.minutes, miles: h.miles }));
     const sum = sumWorkouts(items);
     return { n: hs.length, minutes: sum.minutes, kcal: sum.kcal, estimated: sum.estimated, kinds: Array.from(new Set(items.map(it => it.kind))), source: 'howlers', items };
   }
@@ -947,7 +947,7 @@ function renderWorkoutStrip() {
   // The blue figure is the inner ring's number; minutes and the workouts follow it.
   if (m.kcal) line.append(el('b', { class: 'out', text: (m.estimated ? '~' : '') + fmtK(m.kcal) + ' out' }), ' · Moved ' + m.minutes + ' min · ' + movementLine(m, false));
   else line.append(el('b', { text: 'Moved ' + m.minutes + ' min' }), ' · ' + movementLine(m, true));
-  if (m.source === 'howlers') line.append(' · from The Howlers');
+  if (m.source === 'howlers') line.append(' · from ' + Howlers.name());
   box.appendChild(line);
 }
 function workoutCard(w) {
@@ -961,7 +961,7 @@ function workoutCard(w) {
   bits.forEach((b, i) => { meta.append(el('span', { text: b + (i < bits.length - 1 ? ' ·' : '') })); if (i < bits.length - 1) meta.append(' '); });
   const right = k ? [el('div', { class: 'out', text: (k.estimated ? '~' : '') + fmtK(k.kcal) }), el('div', { class: 'outl', text: 'kcal out' })]
                   : [el('div', { class: 'out', text: String(w.minutes || 0) }), el('div', { class: 'outl', text: 'min' })];
-  return el('button', { class: 'wk', type: 'button', 'aria-label': (saved ? 'Edit ' : 'Edit — from The Howlers — ') + workoutName(w), onclick: () => openMoveSheet(w.id, saved ? null : w) },
+  return el('button', { class: 'wk', type: 'button', 'aria-label': (saved ? 'Edit ' : 'Edit — from ' + Howlers.name() + ' — ') + workoutName(w), onclick: () => openMoveSheet(w.id, saved ? null : w) },
     el('div', { class: 'ico' }, svgIcon(ICON[KIND_ICON[w.kind]] || ICON.spark, 20)),
     el('div', {}, el('div', { class: 'name', text: workoutName(w) }), meta),
     el('div', {}, right));
@@ -1544,7 +1544,7 @@ function openMoveSheet(id, prefill) {
   // is how it becomes a real record, at the id dayMovement() already gave it.
   const pf = !w ? prefill : null;
   const s = openSheet({ title: (w || pf) ? 'Edit workout' : 'Log movement',
-    sub: w ? whenLabel(w) : pf ? 'From The Howlers — correct anything that is off, or leave it as is.' : 'A ride, a walk, weights — whatever it was' });
+    sub: w ? whenLabel(w) : pf ? 'From ' + Howlers.name() + ' — correct anything that is off, or leave it as is.' : 'A ride, a walk, weights — whatever it was' });
   let kind = w ? w.kind : pf ? pf.kind : ((profile().equipment || []).includes('peloton') ? 'ride' : 'walk');
   const PH = { ride: 'Peloton ride · e.g. 30 min Power Zone', walk: 'Neighborhood loop', strength: 'Upper body · dumbbells', mobility: 'Stretch after the ride', run: 'Easy run', other: 'What was it?' };
   const grid = el('div', { class: 'kind-grid' }), kindBtns = {};
@@ -1594,7 +1594,7 @@ function openMoveSheet(id, prefill) {
       (Howlers.forDate(date) || []).forEach((h, i) => {
         const sid = 'wk_howl_' + date + '_' + h.type + '_' + i;
         if (sid !== pf.id && !state.data.records[sid] && (h.minutes > 0 || h.miles > 0)) {
-          addWorkout({ id: sid, date, time: '07:00', kind: howlerKind(h.type), title: h.label, minutes: h.minutes || 0, miles: h.miles || null, source: 'howlers' }, true);
+          addWorkout({ id: sid, date, time: '07:00', kind: howlerKind(h.type, h), title: h.label, minutes: h.minutes || 0, miles: h.miles || null, source: 'howlers' }, true);
         }
       });
       saveData();
@@ -1678,7 +1678,7 @@ async function importPelotonFile(file) {
 function importFromHowlers() {
   const c = Howlers.cache(); if (!c || !c.byDate) return { added: 0, already: 0 };
   const list = [];
-  for (const [date, ws] of Object.entries(c.byDate)) ws.forEach((h, i) => { if (h.minutes > 0 || h.miles > 0) list.push({ id: 'wk_howl_' + date + '_' + h.type + '_' + i, date, time: '07:00', kind: howlerKind(h.type), title: h.label, minutes: h.minutes || 0, miles: h.miles || null, source: 'howlers' }); });
+  for (const [date, ws] of Object.entries(c.byDate)) ws.forEach((h, i) => { if (h.minutes > 0 || h.miles > 0) list.push({ id: 'wk_howl_' + date + '_' + h.type + '_' + i, date, time: '07:00', kind: howlerKind(h.type, h), title: h.label, minutes: h.minutes || 0, miles: h.miles || null, source: 'howlers' }); });
   return importWorkouts(list);
 }
 
@@ -1809,36 +1809,66 @@ function openTargetsSheet() {
 }
 
 /* =====================================================================
-   7b. The Howlers — read-only workouts from the Howlers Gist. Both apps live on ortizzle.github.io, so the
-       Howlers' own Gist keys in localStorage are reused on a phone that runs both; otherwise enter them in Settings.
+   7b. Family workouts, read-only. The Howler Pack (ortizzle.github.io/howler-pack) is the source now:
+       every family workout, Peloton and outside. Both apps share the ortizzle.github.io origin, so the
+       Pack's own keys in localStorage are reused on a phone that runs both (they are JSON-encoded by its Store).
+       The original Howlers still fills any day the Pack has nothing for, until it sunsets after Jan 17, 2027.
+       A day comes from one source or the other, never both, so nothing double-counts.
    ===================================================================== */
 const Howlers = {
   RUN_TYPES: ['long_run', 'easy_run', 'tempo', 'walk_run', 'race', 'optional_run'],
   OTHER_TYPES: ['peloton', 'strength', 'mobility', 'cardio', 'optional_other'],
   LABELS: { long_run: 'Long run', tempo: 'Tempo', easy_run: 'Easy run', walk_run: 'Walk/run', race: 'Race', optional_run: 'Run', peloton: 'Peloton', strength: 'Strength', mobility: 'Mobility', cardio: 'Cardio', optional_other: 'Cross-train' },
-  config() {
-    const own = Store.get('howlers', null);
-    if (own && own.gistId && own.token) return { gistId: own.gistId, token: own.token, playerId: own.playerId || '', shared: false };
+  // Pack activity → Fuel kind. The Tread counts as a run only when its pace says so; otherwise a walk,
+  // the conservative estimate (eating back an overestimated burn is how a deficit evaporates).
+  PACK_KIND: { bike: 'ride', ride: 'ride', run: 'run', walk: 'walk', dogwalk: 'walk', hike: 'walk', tread: 'walk', strength: 'strength', bootcamp: 'strength', yoga: 'mobility', swim: 'other', sport: 'other', play: 'other', park: 'other', tkd: 'other' },
+  PACK_LABEL: { tread: 'Tread', bike: 'Peloton Bike', strength: 'Strength', yoga: 'Yoga', bootcamp: 'Bootcamp', dogwalk: 'Dog walk', park: 'Park', hike: 'Hike', ride: 'Bike ride', swim: 'Swim', tkd: 'Taekwondo', run: 'Run', walk: 'Walk', sport: 'Sport', play: 'Active play' },
+  packConfig() {
     try {
-      const id = localStorage.getItem('howlers_gist_id'), token = localStorage.getItem('howlers_gist_token');
-      if (id && token) return { gistId: id, token, playerId: localStorage.getItem('howlers_current_player') || '', shared: true };
+      const j = k => { const v = localStorage.getItem(k); return v == null ? null : JSON.parse(v); };
+      const gistId = j('pack_gist_id'), token = j('pack_gist_token');
+      if (gistId && token) return { source: 'pack', gistId, token, playerId: Store.get('howlers_pack_player', '') || j('pack_me') || '', shared: true };
     } catch (e) {}
     return null;
   },
+  legacyConfig() {
+    const own = Store.get('howlers', null);
+    if (own && own.gistId && own.token) return { source: 'howlers', gistId: own.gistId, token: own.token, playerId: own.playerId || '', shared: false };
+    try {
+      const id = localStorage.getItem('howlers_gist_id'), token = localStorage.getItem('howlers_gist_token');
+      if (id && token) return { source: 'howlers', gistId: id, token, playerId: localStorage.getItem('howlers_current_player') || '', shared: true };
+    } catch (e) {}
+    return null;
+  },
+  config() { return this.packConfig() || this.legacyConfig(); },
+  name() { const c = this.config(); return c && c.source === 'pack' ? 'The Howler Pack' : 'The Howlers'; },
   connected() { return !!this.config(); },
   cache() { return Store.get('howlers_cache', null); },
   forDate(date) { const c = this.cache(); return c && c.byDate && c.byDate[date] ? c.byDate[date] : []; },
-  async refresh(force) {
-    const cfg = this.config(); if (!cfg) return null;
-    const c = this.cache();
-    if (!force && c && c.playerId === (cfg.playerId || c.playerId) && Date.now() - c.fetchedAt < 30 * 60000) return c;
+  async fetchGist(cfg, fileName, label) {
     const res = await fetch('https://api.github.com/gists/' + encodeURIComponent(cfg.gistId), { headers: { 'Authorization': 'Bearer ' + cfg.token, 'Accept': 'application/vnd.github+json' }, cache: 'no-store' });
-    if (!res.ok) throw new Error('The Howlers Gist answered ' + res.status);
+    if (!res.ok) throw new Error(label + ' answered ' + res.status);
     const gist = await res.json();
-    const file = gist.files && (gist.files['howlers-data.json'] || gist.files[Object.keys(gist.files).find(k => k.endsWith('.json'))]);
-    if (!file) throw new Error('No data file in the Howlers Gist');
-    const text = file.truncated ? await (await fetch(file.raw_url)).text() : file.content;
-    const st = JSON.parse(text || '{}');
+    const file = gist.files && (gist.files[fileName] || gist.files[Object.keys(gist.files).find(k => k.endsWith('.json'))]);
+    if (!file) throw new Error('No data file in the ' + label + ' Gist');
+    const text = file.truncated ? await (await fetch(file.raw_url, { cache: 'no-store' })).text() : file.content;
+    return JSON.parse(text || '{}');
+  },
+  async readPack(cfg) {
+    const st = await this.fetchGist(cfg, 'howler-pack.json', 'The Howler Pack');
+    const recs = Object.values(st.records || {}).filter(r => r && !r.deleted);
+    const players = recs.filter(r => r.type === 'member').sort((a, b) => (a.order || 9) - (b.order || 9)).map(m => ({ id: String(m.mid), name: String(m.name || m.mid) }));
+    const me = cfg.playerId || (players[0] ? players[0].id : '');
+    const byDate = {}; let count = 0;
+    recs.filter(r => r.type === 'workout' && r.member === me && r.date && Number(r.min) > 0).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)).forEach(w => {
+      const d = w.detail || {}, kind = w.act === 'tread' && Number(d.mph) >= 4.5 ? 'run' : (this.PACK_KIND[w.act] || 'other');
+      (byDate[w.date] = byDate[w.date] || []).push({ type: 'pack_' + w.act, kind, label: w.title || this.PACK_LABEL[w.act] || String(w.act), miles: Number(d.miles) || 0, minutes: Number(w.min) || 0, run: kind === 'run' });
+      count++;
+    });
+    return { fetchedAt: Date.now(), source: 'pack', gistId: cfg.gistId, playerId: me, players, byDate, count, legacyCount: 0 };
+  },
+  async readLegacy(cfg) {
+    const st = await this.fetchGist(cfg, 'howlers-data.json', 'The Howlers');
     const players = (st.players || []).map(p => ({ id: String(p.id), name: String(p.name || p.id) }));
     const me = cfg.playerId || (players[0] ? players[0].id : '');
     const byDate = {}; let count = 0;
@@ -1849,7 +1879,21 @@ const Howlers = {
       (byDate[w.date] = byDate[w.date] || []).push({ type: w.workout, label: this.LABELS[w.workout] || String(w.workout), miles: Number(w.miles) || 0, minutes: Number(w.minutes) || 0, run });
       count++;
     }
-    const out = { fetchedAt: Date.now(), playerId: me, players, byDate, count };
+    return { fetchedAt: Date.now(), source: 'howlers', gistId: cfg.gistId, playerId: me, players, byDate, count };
+  },
+  async refresh(force) {
+    const cfg = this.config(); if (!cfg) return null;
+    const c = this.cache();
+    if (!force && c && c.source === cfg.source && c.gistId === cfg.gistId && c.playerId === (cfg.playerId || c.playerId) && Date.now() - c.fetchedAt < 30 * 60000) return c;
+    let out;
+    if (cfg.source === 'pack') {
+      out = await this.readPack(cfg);
+      const legacy = this.legacyConfig();
+      if (legacy) {
+        try { const old = await this.readLegacy(legacy); for (const [d, ws] of Object.entries(old.byDate)) if (!out.byDate[d]) { out.byDate[d] = ws; out.count += ws.length; out.legacyCount += ws.length; } }
+        catch (e) { /* the old app is optional now */ }
+      }
+    } else out = await this.readLegacy(cfg);
     Store.set('howlers_cache', out);
     return out;
   }
@@ -1860,18 +1904,18 @@ function renderHowlersSettings(box) {
   const status = el('div', { class: 'note' });
   const refreshBtn = el('button', { class: 'btn', type: 'button', text: 'Refresh workouts' });
   const doRefresh = async () => {
-    refreshBtn.disabled = true; statusLine(status, 'Reading the Howlers Gist…', 'busy');
+    refreshBtn.disabled = true; statusLine(status, 'Reading ' + Howlers.name() + '…', 'busy');
     try { const c = await Howlers.refresh(true); renderHowlersSettings(box); render(); toast('Loaded ' + c.count + ' workouts'); }
     catch (e) { statusLine(status, String((e && e.message) || e), 'err'); refreshBtn.disabled = false; }
   };
   refreshBtn.addEventListener('click', doRefresh);
   if (cfg) {
     const who = cache && cache.players.find(p => p.id === (cfg.playerId || cache.playerId));
-    status.textContent = (cfg.shared ? 'Connected through The Howlers on this device' : 'Connected with the Gist below') + (who ? ' · ' + who.name : '') + (cache ? ' · ' + cache.count + ' workouts, refreshed ' + new Date(cache.fetchedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : ' · not loaded yet');
+    status.textContent = (cfg.source === 'pack' ? 'Connected through The Howler Pack on this phone' + (cache && cache.legacyCount ? ' (older days from The Howlers)' : '') : cfg.shared ? 'Connected through The Howlers on this device' : 'Connected with the Gist below') + (who ? ' · ' + who.name : '') + (cache ? ' · ' + cache.count + ' workouts, refreshed ' + new Date(cache.fetchedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : ' · not loaded yet');
     box.append(status);
     if (cache && cache.players.length > 1) {
       const sel = el('select', { 'aria-label': 'Howler' }, cache.players.map(p => el('option', { value: p.id, text: p.name, selected: p.id === cache.playerId ? true : null })));
-      sel.addEventListener('change', () => { const own = Store.get('howlers', null) || { gistId: cfg.gistId, token: cfg.token }; own.playerId = sel.value; Store.set('howlers', own); doRefresh(); });
+      sel.addEventListener('change', () => { if (cfg.source === 'pack') { Store.set('howlers_pack_player', sel.value); doRefresh(); return; } const own = Store.get('howlers', null) || { gistId: cfg.gistId, token: cfg.token }; own.playerId = sel.value; Store.set('howlers', own); doRefresh(); });
       box.append(el('div', { class: 'field' }, el('label', { text: 'Whose workouts' }), sel));
     }
     const row = el('div', { class: 'btn-row' }, refreshBtn);
@@ -1885,7 +1929,7 @@ function renderHowlersSettings(box) {
     const gistId = idIn.value.trim(), token = tokIn.value.trim(); if (!gistId || !token) { toast('Enter the Gist ID and token'); return; }
     Store.set('howlers', { gistId, token, playerId: '' }); await doRefresh();
   } });
-  status.textContent = 'Not connected. On a phone that also runs The Howlers, Fuel picks up its Gist keys automatically; otherwise paste them here.';
+  status.textContent = 'Not connected. On a phone that also runs The Howler Pack (or the original Howlers), Fuel picks up its keys automatically; otherwise paste a Howlers Gist ID and token here.';
   addKids(box, status, el('div', { class: 'field' }, idIn), el('div', { class: 'field' }, tokIn), connect);
 }
 
@@ -2606,7 +2650,7 @@ function openSettings() {
   [openIn, avoidIn, goalIn, wtIn].forEach(i => i.addEventListener('change', saveProfile));
   const pelIn = el('input', { type: 'file', accept: '.csv,text/csv', class: 'hidden', 'aria-label': 'Peloton workouts CSV' });
   pelIn.addEventListener('change', async () => { const f = pelIn.files && pelIn.files[0]; pelIn.value = ''; if (f) await importPelotonFile(f); });
-  const howlImport = Howlers.connected() && Howlers.cache() ? el('button', { class: 'btn', type: 'button', text: 'Import Howlers history', onclick: () => { const r = importFromHowlers(); render(); toast(r.added ? 'Imported ' + r.added + ' workouts' + (r.already ? ' · ' + r.already + ' already here' : '') : 'Nothing new to import'); } }) : null;
+  const howlImport = Howlers.connected() && Howlers.cache() ? el('button', { class: 'btn', type: 'button', text: 'Import ' + (Howlers.config() && Howlers.config().source === 'pack' ? 'Pack' : 'Howlers') + ' history', onclick: () => { const r = importFromHowlers(); render(); toast(r.added ? 'Imported ' + r.added + ' workouts' + (r.already ? ' · ' + r.already + ' already here' : '') : 'Nothing new to import'); } }) : null;
   const workoutCount = Object.values(state.data.records).filter(r => r.type === 'workout' && !r.deleted).length;
   Object.values(tIn).forEach(i => i.addEventListener('change', saveTargets));
   const scheme = segControl([['system', 'System'], ['light', 'Light'], ['dark', 'Dark']], state.settings.scheme || 'system', (v) => applyScheme(v));
@@ -2660,7 +2704,7 @@ function openSettings() {
       el('div', { class: 'note' }, workoutCount + (workoutCount === 1 ? ' workout' : ' workouts') + ' logged on this device.'),
       el('div', { class: 'btn-row' }, el('button', { class: 'btn', type: 'button', onclick: () => pelIn.click() }, svgIcon(ICON.upload, 18), 'Import Peloton CSV'), howlImport), pelIn,
       el('div', { class: 'note' }, 'Peloton: members.onepeloton.com → your profile → Workouts → Download. Re-importing never duplicates a ride.')),
-    el('div', { class: 'field', style: 'margin-top:16px' }, el('label', { text: 'The Howlers workouts' }), howlersBox),
+    el('div', { class: 'field', style: 'margin-top:16px' }, el('label', { text: 'Family workouts (The Howler Pack)' }), howlersBox),
     el('div', { class: 'field', style: 'margin-top:16px' }, el('label', { text: 'Backup' }), stats, backupAge,
       el('div', { class: 'btn-row' }, shareBtn, downloadBtn),
       el('button', { class: 'btn ghost', type: 'button', text: 'Restore from a backup file', style: 'margin-top:10px', onclick: () => restoreIn.click() }), restoreIn,

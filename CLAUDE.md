@@ -55,7 +55,13 @@ letters always sit beside the numbers so identity never depends on colour alone.
   as a `blob:` URL or `data:` URI makes Chrome fall back to a badged bookmark shortcut
   instead of installing the app.
 - **All `ortizzle.github.io` apps share one localStorage origin.** That is how the
-  Howlers workout hook reads its Gist keys without any plumbing. It also means two apps
+  workout hook reads its Gist keys without any plumbing. The source is **The Howler Pack**
+  (`pack_gist_id` / `pack_gist_token` / `pack_me`, JSON-encoded by the Pack's `Store`, file
+  `howler-pack.json`, `workout` records with `member`/`act`/`min`/`detail`); the original Howlers
+  (raw `howlers_*` keys) only fills days the Pack has nothing for, until it sunsets after Jan 17,
+  2027. Pack items carry their own Fuel `kind` (`howlerKind(type, h)` honours it); the Tread is a
+  run only at ≥4.5 mph, otherwise a walk (the conservative burn). Cache ids, `source:'howlers'` and
+  the `wk_howl_` prefix are unchanged so existing promoted/imported records still match. It also means two apps
   on that host share storage on a given device.
 - **Every storage read and write goes through `Store`**, which namespaces with `fuel_`.
   That single choke point is what would make per-person profiles cheap.
