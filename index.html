@@ -1823,6 +1823,7 @@ const Howlers = {
   // the conservative estimate (eating back an overestimated burn is how a deficit evaporates).
   PACK_KIND: { bike: 'ride', ride: 'ride', run: 'run', walk: 'walk', dogwalk: 'walk', hike: 'walk', tread: 'walk', strength: 'strength', bootcamp: 'strength', yoga: 'mobility', stretch: 'mobility', pickleball: 'other', swim: 'other', sport: 'other', play: 'other', park: 'other', tkd: 'other' },
   PACK_LABEL: { tread: 'Tread', bike: 'Peloton Bike', strength: 'Strength', yoga: 'Yoga', bootcamp: 'Bootcamp', dogwalk: 'Dog walk', park: 'Park', hike: 'Hike', ride: 'Bike ride', swim: 'Swim', tkd: 'Taekwondo', run: 'Run', walk: 'Walk', sport: 'Sport', play: 'Active play', stretch: 'Stretch', pickleball: 'Pickleball' },
+  PACK_CLS: { run: 'run', walk: 'walk', hike: 'hike', bootcamp: 'bootcamp', ride: 'ride', lowimpact: 'low impact' },
   packConfig() {
     try {
       const j = k => { const v = localStorage.getItem(k); return v == null ? null : JSON.parse(v); };
@@ -1861,8 +1862,8 @@ const Howlers = {
     const me = cfg.playerId || (players[0] ? players[0].id : '');
     const byDate = {}; let count = 0;
     recs.filter(r => r.type === 'workout' && r.member === me && r.date && Number(r.min) > 0 && r.act !== 'meditate').sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)).forEach(w => {
-      const d = w.detail || {}, kind = w.act === 'tread' && Number(d.mph) >= 4.5 ? 'run' : (this.PACK_KIND[w.act] || 'other');
-      (byDate[w.date] = byDate[w.date] || []).push({ type: 'pack_' + w.act, kind, label: w.title || this.PACK_LABEL[w.act] || String(w.act), miles: Number(d.miles) || 0, minutes: Number(w.min) || 0, run: kind === 'run' });
+      const d = w.detail || {}, kind = d.cls === 'bootcamp' ? 'strength' : w.act === 'tread' ? (d.cls ? (d.cls === 'run' ? 'run' : 'walk') : Number(d.mph) >= 4.5 ? 'run' : 'walk') : (this.PACK_KIND[w.act] || 'other');
+      (byDate[w.date] = byDate[w.date] || []).push({ type: 'pack_' + w.act, kind, label: w.title || (this.PACK_LABEL[w.act] || String(w.act)) + (d.cls && this.PACK_CLS[d.cls] ? ' ' + this.PACK_CLS[d.cls] : ''), miles: Number(d.miles) || 0, minutes: Number(w.min) || 0, run: kind === 'run' });
       count++;
     });
     return { fetchedAt: Date.now(), source: 'pack', gistId: cfg.gistId, playerId: me, players, byDate, count, legacyCount: 0 };
