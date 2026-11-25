@@ -1821,8 +1821,8 @@ const Howlers = {
   LABELS: { long_run: 'Long run', tempo: 'Tempo', easy_run: 'Easy run', walk_run: 'Walk/run', race: 'Race', optional_run: 'Run', peloton: 'Peloton', strength: 'Strength', mobility: 'Mobility', cardio: 'Cardio', optional_other: 'Cross-train' },
   // Pack activity → Fuel kind. The Tread counts as a run only when its pace says so; otherwise a walk,
   // the conservative estimate (eating back an overestimated burn is how a deficit evaporates).
-  PACK_KIND: { bike: 'ride', ride: 'ride', run: 'run', walk: 'walk', dogwalk: 'walk', hike: 'walk', tread: 'walk', strength: 'strength', bootcamp: 'strength', yoga: 'mobility', swim: 'other', sport: 'other', play: 'other', park: 'other', tkd: 'other' },
-  PACK_LABEL: { tread: 'Tread', bike: 'Peloton Bike', strength: 'Strength', yoga: 'Yoga', bootcamp: 'Bootcamp', dogwalk: 'Dog walk', park: 'Park', hike: 'Hike', ride: 'Bike ride', swim: 'Swim', tkd: 'Taekwondo', run: 'Run', walk: 'Walk', sport: 'Sport', play: 'Active play' },
+  PACK_KIND: { bike: 'ride', ride: 'ride', run: 'run', walk: 'walk', dogwalk: 'walk', hike: 'walk', tread: 'walk', strength: 'strength', bootcamp: 'strength', yoga: 'mobility', stretch: 'mobility', pickleball: 'other', swim: 'other', sport: 'other', play: 'other', park: 'other', tkd: 'other' },
+  PACK_LABEL: { tread: 'Tread', bike: 'Peloton Bike', strength: 'Strength', yoga: 'Yoga', bootcamp: 'Bootcamp', dogwalk: 'Dog walk', park: 'Park', hike: 'Hike', ride: 'Bike ride', swim: 'Swim', tkd: 'Taekwondo', run: 'Run', walk: 'Walk', sport: 'Sport', play: 'Active play', stretch: 'Stretch', pickleball: 'Pickleball' },
   packConfig() {
     try {
       const j = k => { const v = localStorage.getItem(k); return v == null ? null : JSON.parse(v); };
@@ -1860,7 +1860,7 @@ const Howlers = {
     const players = recs.filter(r => r.type === 'member').sort((a, b) => (a.order || 9) - (b.order || 9)).map(m => ({ id: String(m.mid), name: String(m.name || m.mid) }));
     const me = cfg.playerId || (players[0] ? players[0].id : '');
     const byDate = {}; let count = 0;
-    recs.filter(r => r.type === 'workout' && r.member === me && r.date && Number(r.min) > 0).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)).forEach(w => {
+    recs.filter(r => r.type === 'workout' && r.member === me && r.date && Number(r.min) > 0 && r.act !== 'meditate').sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)).forEach(w => {
       const d = w.detail || {}, kind = w.act === 'tread' && Number(d.mph) >= 4.5 ? 'run' : (this.PACK_KIND[w.act] || 'other');
       (byDate[w.date] = byDate[w.date] || []).push({ type: 'pack_' + w.act, kind, label: w.title || this.PACK_LABEL[w.act] || String(w.act), miles: Number(d.miles) || 0, minutes: Number(w.min) || 0, run: kind === 'run' });
       count++;
