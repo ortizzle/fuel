@@ -215,6 +215,7 @@ letters always sit beside the numbers so identity never depends on colour alone.
   (220 lb, 5'10", 45, male, sedentary → 2,267 maintenance, 1,767 steady). A target below the floor
   (1,500 men / 1,200 women) is flagged, never blocked. `profileContext()` folds maintenance and the
   current target in, so every prompt knows whether the user is cutting and by how much.
+- **The goal weight comes from The Howler Pack when it's set there.** The Pack saves it on the phone as `pack_goal_lb` (JSON, shared origin). `withPackGoal(p)` folds it into the profile at the two `estimateTargets` call sites, so `estimateTargets` itself stays pure. When the Pack has a goal, Fuel's own goal box is read-only ("set in the Howler Pack").
 - **The training profile is context, not a plan.** `profileContext()` is injected into every AI
   prompt. The old hardcoded "training for a half marathon" line is gone — do not put personal
   assumptions in prompt text; they belong in Settings where the user can change them.
