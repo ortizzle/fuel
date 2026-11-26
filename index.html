@@ -829,7 +829,7 @@ function profileContext() {
   if (p.avoid) bits.push('not right now: ' + p.avoid);
   if (p.goal) bits.push('goal: ' + p.goal);
   if (Number(p.weightLb) > 0) bits.push('weight about ' + Math.round(p.weightLb) + ' lb');
-  const est = estimateTargets(p), tk = Number(state.settings.targets.kcal) || 0;
+  const est = estimateTargets(withPackGoal(p)), tk = Number(state.settings.targets.kcal) || 0;
   if (est.maintenance) bits.push('estimated maintenance about ' + est.maintenance + ' kcal/day; daily calorie target ' + tk + (tk && tk < est.maintenance ? ' (about ' + (est.maintenance - tk) + ' below maintenance, aiming to lose weight)' : ''));
   return bits.length ? "About the user's training — " + bits.join('; ') + '. Anything you suggest that involves exercise must fit this.' : '';
 }
@@ -1689,6 +1689,10 @@ function importFromHowlers() {
    ===================================================================== */
 const ACTIVITY = [['sedentary', 'Sedentary', 1.2, 'Desk days, little planned exercise beyond what is logged'], ['light', 'Light', 1.375, 'On your feet a fair amount, or a few short sessions a week'], ['moderate', 'Moderate', 1.55, 'Moving most days, 30–60 min'], ['active', 'Active', 1.725, 'Hard training most days']];
 const GOAL_MODES = [['steady', 'Steady loss', -500], ['faster', 'Faster loss', -750], ['maintain', 'Maintain', 0], ['custom', 'Custom', null]];
+// The Howler Pack is the one place a goal weight is set; it saves it on this phone as pack_goal_lb (shared origin, JSON).
+// estimateTargets stays pure: callers pass a profile with the Pack's goal folded in.
+function packGoalLb() { try { const v = Number(JSON.parse(localStorage.getItem('pack_goal_lb'))); return v > 50 && v < 500 ? v : 0; } catch (e) { return 0; } }
+function withPackGoal(p) { const g = packGoalLb(); return g ? Object.assign({}, p, { goalLb: g }) : p; }
 function estimateTargets(p) {
   p = p || {};
   const w = Number(p.weightLb) || 0, h = Number(p.heightIn) || 0, a = Number(p.age) || 0;
@@ -1734,7 +1738,7 @@ function openTargetsSheet() {
   const setHeight = () => { const h = numVal(ftIn, 0) * 12 + numVal(inIn, 0); P.heightIn = h > 0 ? h : null; saveSettings(); refresh(); };
   ftIn.addEventListener('change', setHeight); inIn.addEventListener('change', setHeight);
   const ageIn = num('age', { 'aria-label': 'Age', inputmode: 'numeric', placeholder: 'years' });
-  const goalIn = num('goalLb', { 'aria-label': 'Goal weight in pounds', placeholder: 'optional' });
+  const goalIn = packGoalLb() ? el('input', { type: 'text', value: packGoalLb() + ' · set in the Howler Pack', disabled: true, 'aria-label': 'Goal weight, set in the Howler Pack' }) : num('goalLb', { 'aria-label': 'Goal weight in pounds', placeholder: 'optional' });
   const kcalIn = numInput({ value: '', 'aria-label': 'Calorie target', inputmode: 'numeric' });
   kcalIn.addEventListener('change', () => { const v = numVal(kcalIn, 0); if (v > 0) { P.goalMode = 'custom'; P.kcalCustom = Math.round(v); saveSettings(); refresh(); } });
   const sexSeg = segControl([['m', 'Male'], ['f', 'Female']], P.sex === 'f' ? 'f' : 'm', (v) => { P.sex = v; saveSettings(); refresh(); });
@@ -1747,7 +1751,7 @@ function openTargetsSheet() {
     el('div', { class: 'th' }, el('span', { style: 'color:var(--' + key + ')', text: label }), el('span', { class: 'num', text: grams + ' g' + (pctv ? ' · ' + Math.round(pctv * 100) + '%' : '') })),
     el('div', { class: 'tw', text: why }));
   const refresh = () => {
-    est = estimateTargets(P);
+    est = estimateTargets(withPackGoal(P));
     actHint.textContent = est.activity[3] + '. Logged movement counts separately: about ' + movementAverage(14) + ' min a day over the last 14 days.';
     clear(maint);
     if (est.maintenance) maint.append(el('div', { class: 'v', text: '≈ ' + fmtK(est.maintenance) + ' kcal a day' }), el('div', { class: 'l', text: 'to stay where you are · Mifflin-St Jeor × ' + est.activity[2] }));
@@ -1770,7 +1774,7 @@ function openTargetsSheet() {
     if (est.target) {
       const T = est.targets;
       rows.append(
-        row('protein', 'Protein', T.protein, est.pct.protein, (Number(P.goalLb) > 0 ? '0.8 g per lb of goal weight' : '0.7 g per lb') + ' — the lever that holds on to muscle while you cut, and the most filling macro.'),
+        row('protein', 'Protein', T.protein, est.pct.protein, (Number(withPackGoal(P).goalLb) > 0 ? '0.8 g per lb of goal weight' : '0.7 g per lb') + ' — the lever that holds on to muscle while you cut, and the most filling macro.'),
         row('fat', 'Fat', T.fat, est.pct.fat, 'A quarter of calories, never under 40 g — the floor for hormones and for meals that actually satisfy.'),
         row('carbs', 'Carbs', T.carbs, est.pct.carbs, 'What is left after protein and fat. Fuel for the rides, and the first place to trim when a day runs over.'),
         row('fiber', 'Fiber', T.fiber, 0, '14 g per 1,000 kcal, at least 25 — fullness on fewer calories.'));
@@ -3106,7 +3110,7 @@ function init() {
   AI.init();
   if (Howlers.connected()) Howlers.refresh(false).then(() => { renderWorkoutStrip(); if (state.view === 'insights') renderInsights(); }).catch(() => {});
 }
-window.Fuel = { state, AZ, Store, Howlers, estimateTargets, openTargetsSheet, movementAverage, ACTIVITY, GOAL_MODES, addWorkout, updateWorkout, deleteWorkout, workoutsFor, dayMovement, workoutKcal, parseCSV, parsePelotonCSV, importWorkouts, importFromHowlers, openMoveSheet, profileContext, KINDS, getSummary, saveSummary, dropSummary, daySummaryId, rangeSummaryId, dayFingerprint, rangeFingerprint, summarizeDay, recentFoods, savedMeals, saveMealFrom, deleteSavedMeal, logSavedMeal, photoTimestamp, parseExifDate, guessMeal, defaultContext, addEntry, updateEntry, deleteEntry, entriesFor, dayTotals, computeStats, render, renderInsights, showView, Scanner, FoodDB, AI, parseEstimate, parseJSONLoose, normalizeOFF, normalizeUSDA, normalizeBarcode, upcEToA, codeVariants, openScanSheet, openPhotoSheet, openAddSheet, openEditSheet, openSettings, seedSampleDays, applyScheme, closeSheet, MEALS, CONTEXTS };
+window.Fuel = { state, AZ, Store, Howlers, estimateTargets, withPackGoal, packGoalLb, openTargetsSheet, movementAverage, ACTIVITY, GOAL_MODES, addWorkout, updateWorkout, deleteWorkout, workoutsFor, dayMovement, workoutKcal, parseCSV, parsePelotonCSV, importWorkouts, importFromHowlers, openMoveSheet, profileContext, KINDS, getSummary, saveSummary, dropSummary, daySummaryId, rangeSummaryId, dayFingerprint, rangeFingerprint, summarizeDay, recentFoods, savedMeals, saveMealFrom, deleteSavedMeal, logSavedMeal, photoTimestamp, parseExifDate, guessMeal, defaultContext, addEntry, updateEntry, deleteEntry, entriesFor, dayTotals, computeStats, render, renderInsights, showView, Scanner, FoodDB, AI, parseEstimate, parseJSONLoose, normalizeOFF, normalizeUSDA, normalizeBarcode, upcEToA, codeVariants, openScanSheet, openPhotoSheet, openAddSheet, openEditSheet, openSettings, seedSampleDays, applyScheme, closeSheet, MEALS, CONTEXTS };
 init();
 })();
 </script>
